@@ -360,6 +360,7 @@ class _EditItemPageState extends State<EditItemPage> {
     // }
   }
 
+// подключение к камере
   Future<void> _takePhoto() async {
     File? _selectedImageFile;
 
