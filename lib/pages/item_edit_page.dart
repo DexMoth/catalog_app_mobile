@@ -5,8 +5,8 @@ import 'dart:typed_data';
 import 'package:catalog_app_mobile/pages/take_photo_page.dart';
 import 'package:catalog_app_mobile/services/camera_service.dart';
 import 'package:flutter/material.dart';
-import 'package:gallery_picker/gallery_picker.dart';
-import 'package:gallery_picker/models/media_file.dart';
+// import 'package:gallery_picker/gallery_picker.dart';
+// import 'package:gallery_picker/models/media_file.dart';
 import '../models/item.dart';
 import '../services/api_service.dart';
 import '../services/image_service.dart';
@@ -30,7 +30,7 @@ class _EditItemPageState extends State<EditItemPage> {
   File? _selectedImageFile;
   Uint8List? _selectedImageBytes;
 
-  final GalleryService _galleryService = GalleryService();
+  // final GalleryService _galleryService = GalleryService();
 
   @override
   void initState() {
@@ -338,26 +338,26 @@ class _EditItemPageState extends State<EditItemPage> {
   }
 
   Future<void> _selectFromGallery() async {
-    final files = await GalleryPicker.pickMedia(
-      context: context,
-      singleMedia: true,
-      config: Config(
-        mode: Mode.light,
-        recents: "Недавние",
-        gallery: "Галерея",
-        tapPhotoSelect: "Нажмите для выбора",
-      ),
-    );
-
-    if (files?.isNotEmpty ?? false) {
-      final file = await files!.first.file;
-      if (file != null) {
-        setState(() {
-          _selectedImageBytes = file.readAsBytesSync();
-          _selectedImagePath = file.path;
-        });
-      }
-    }
+    // final files = await GalleryPicker.pickMedia(
+    //   context: context,
+    //   singleMedia: true,
+    //   config: Config(
+    //     mode: Mode.light,
+    //     recents: "Недавние",
+    //     gallery: "Галерея",
+    //     tapPhotoSelect: "Нажмите для выбора",
+    //   ),
+    // );
+    //
+    // if (files?.isNotEmpty ?? false) {
+    //   final file = await files!.first.file;
+    //   if (file != null) {
+    //     setState(() {
+    //       _selectedImageBytes = file.readAsBytesSync();
+    //       _selectedImagePath = file.path;
+    //     });
+    //   }
+    // }
   }
 
   Future<void> _takePhoto() async {
