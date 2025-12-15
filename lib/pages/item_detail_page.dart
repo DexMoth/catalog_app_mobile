@@ -232,55 +232,78 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 12),
-          if (itemCategories.isEmpty)
-            const Text(
-              'Категории не указаны',
-              style: TextStyle(color: Colors.grey, fontStyle: FontStyle.italic),
-            )
-          else
-            Wrap(
-              spacing: 6,
-              runSpacing: 1,
-              children: [
-                ...itemCategories.map((category) {
-                  return Chip(
-                    label: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      child: Text(
-                        category.name,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+          Wrap(
+            spacing: 6,
+            runSpacing: 1,
+            children: [
+              // Показываем только первую категорию (если есть)
+              if (itemCategories.isNotEmpty)
+                Chip(
+                  label: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          itemCategories.first.name,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
-                      ),
-                    ),
-                    backgroundColor: Colors.brown.withOpacity(0.1),
-                    labelStyle: const TextStyle(color: Colors.brown),
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                  );
-                }),
-                IconButton(
-                  onPressed: () {
-                    _showDialogAddCategory(context);
-                  },
-                  icon: Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.brown.withOpacity(0.3)),
-                    ),
-                    child: const Icon(
-                      Icons.add,
-                      size: 18,
-                      color: Colors.brown,
+                        const SizedBox(width: 4),
+                        GestureDetector(
+                          onTap: () {
+                            // Удаляем категорию при нажатии на крестик
+                            setState(() {
+                              _currentItem.categories = [];
+                            });
+                          },
+                          child: const Icon(
+                            Icons.close,
+                            size: 14,
+                            color: Colors.brown,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                  backgroundColor: Colors.brown.withOpacity(0.1),
+                  labelStyle: const TextStyle(color: Colors.brown),
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
+                  visualDensity: VisualDensity.compact,
                 ),
-              ],
-            ),
+              // Сообщение если нет категорий
+              if (itemCategories.isEmpty)
+                const Text(
+                  'Категория не выбрана',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontStyle: FontStyle.italic,
+                    fontSize: 12,
+                  ),
+                ),
+              // Кнопка добавления категории - ВСЕГДА показывается
+              IconButton(
+                onPressed: () {
+                  _showDialogAddCategory(context);
+                },
+                icon: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.brown.withOpacity(0.3)),
+                  ),
+                  child: Icon(
+                    itemCategories.isEmpty ? Icons.add : Icons.edit,
+                    size: 18,
+                    color: Colors.brown,
+                  ),
+                ),
+                padding: EdgeInsets.zero,
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -295,7 +318,7 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
         }
 
         final tags = snapshot.data ?? [];
-        final itemTags = widget.item.tags ?? []; // Теги текущей вещи
+        final itemTags = _currentItem.tags ?? []; // Теги текущей вещи
 
         return Card(
           elevation: 2,
@@ -333,7 +356,7 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       ...tags.map((tag) {
-                        final isSelected = itemTags.contains(tag.id);
+                        final isSelected = itemTags.any((t) => t.id == tag.id);
 
                         return InkWell(
                           onTap: () => _toggleTag(tag),
@@ -368,29 +391,28 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
                         );
                       }).toList(),
 
-                      // кнопка добавления
-                      IconButton(
-                        onPressed: () {
-                          print('Добавить тег');
-                          _showDialogAddTag(context);
-                        },
-                        icon: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.brown.withOpacity(0.3),
-                            ),
-                          ),
-                          child: const Icon(
-                            Icons.add,
-                            size: 18,
-                            color: Colors.brown,
-                          ),
-                        ),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      ),
+                      // кнопка добавления , будет в вкр
+                      // IconButton(
+                      //   onPressed: () {
+                      //     _showDialogAddTag(context);
+                      //   },
+                      //   icon: Container(
+                      //     padding: const EdgeInsets.all(6),
+                      //     decoration: BoxDecoration(
+                      //       shape: BoxShape.circle,
+                      //       border: Border.all(
+                      //         color: Colors.brown.withOpacity(0.3),
+                      //       ),
+                      //     ),
+                      //     child: const Icon(
+                      //       Icons.add,
+                      //       size: 18,
+                      //       color: Colors.brown,
+                      //     ),
+                      //   ),
+                      //   padding: EdgeInsets.zero,
+                      //   constraints: const BoxConstraints(),
+                      // ),
                     ],
                   ),
               ],
@@ -406,7 +428,7 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
     setState(() {
       final currentTags = _currentItem.tags ?? [];
 
-      // Проверяем, привязан ли уже этот тег по id
+      // Проверяем, привязан ли уже этот тег
       final isTagEnabled = currentTags.any((t) => t.id == tag.id);
 
       if (isTagEnabled) {
@@ -449,35 +471,76 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
     final TextEditingController controller = TextEditingController();
 
     showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text("Добавление нового тега"),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(
-              labelText: 'Название тега',
-              hintText: 'Введите название',
-              border: OutlineInputBorder(),
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          bool isCreating = false;
+
+          return AlertDialog(
+            title: const Text("Добавить тег"),
+            content: isCreating
+                ? const Center(child: CircularProgressIndicator())
+                : TextField(
+              controller: controller,
+              decoration: const InputDecoration(
+                labelText: 'Название тега',
+                border: OutlineInputBorder(),
+              ),
+              autofocus: true,
             ),
-            autofocus: true,
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Отмена')
-            ),
-            TextButton(
-                onPressed: () {
+            actions: [
+              if (!isCreating)
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Отмена'),
+                ),
+              ElevatedButton(
+                onPressed: isCreating
+                    ? null
+                    : () async {
                   final newName = controller.text.trim();
-                  if (newName.isNotEmpty) {
-                    // API
+                  if (newName.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Введите название')),
+                    );
+                    return;
+                  }
+
+                  setState(() => isCreating = true);
+
+                  try {
+                    final newTag = Tag(
+                      id: 0,
+                      name: newName,
+                    );
+
+                    setState(() {
+                      final currentTags = _currentItem.tags ?? [];
+                      _currentItem.tags = [...currentTags, newTag];
+                    });
+                    final newTag1 = await ApiService().createTag(newName);
+                    // Закрываем диалог
                     Navigator.pop(context);
+
+                  } catch (e) {
+                    setState(() => isCreating = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Ошибка: $e')),
+                    );
                   }
                 },
-                child: const Text('Сохранить')
-            )
-          ],
-        )
+                child: isCreating
+                    ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+                    : const Text('Добавить'),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
@@ -489,67 +552,63 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
           future: ApiService().getCategories(),
           builder: (context, snapshot) {
             final categories = snapshot.data ?? [];
-            final selectedCategories = _currentItem.categories ?? [];
+            final currentCategory = _currentItem.categories?.isNotEmpty == true
+                ? _currentItem.categories!.first
+                : null;
 
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
 
-            return StatefulBuilder(
-              builder: (context, setDialogState) {
-                return AlertDialog(
-                  title: const Text('Выберите категорию'),
-                  content: SizedBox(
-                    width: double.maxFinite,
-                    height: 400,
-                    child: ListView.builder(
-                      itemCount: categories.length,
-                      itemBuilder: (context, index) {
-                        final category = categories[index];
-                        final isSelected = selectedCategories.any((c) => c.id == category.id);
+            return AlertDialog(
+              title: const Text('Выберите категорию'),
+              content: SizedBox(
+                width: double.maxFinite,
+                height: 300,
+                child: ListView.builder(
+                  itemCount: categories.length,
+                  itemBuilder: (context, index) {
+                    final category = categories[index];
+                    final isSelected = currentCategory?.id == category.id;
 
-                        return CheckboxListTile(
-                          title: Text(category.name),
-                          value: isSelected,
-                          onChanged: (selected) {
-                            setDialogState(() {
-                              final currentCategories = _currentItem.categories ?? [];
-
-                              if (selected == true) {
-                                _currentItem.categories = [
-                                  ...currentCategories,
-                                  category
-                                ];
-                              } else {
-                                _currentItem.categories = currentCategories
-                                    .where((c) => c.id != category.id)
-                                    .toList();
-                              }
-                            });
-                          },
-                        );
-                      },
-                    ),
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Отмена'),
-                    ),
-                    ElevatedButton(
-                      onPressed: () {
-                        setState(() {}); // Обновляем основной экран
+                    return ListTile(
+                      title: Text(category.name),
+                      trailing: isSelected ? const Icon(Icons.check, color: Colors.brown) : null,
+                      onTap: () {
+                        setState(() {
+                          if (isSelected) {
+                            // Если уже выбрана - убираем
+                            _currentItem.categories = [];
+                          } else {
+                            // Выбираем новую
+                            _currentItem.categories = [category];
+                          }
+                        });
                         Navigator.pop(context);
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.brown,
-                        foregroundColor: Colors.white,
-                      ),
-                      child: const Text('Сохранить'),
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Отмена'),
+                ),
+                if (currentCategory != null)
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _currentItem.categories = [];
+                      });
+                      Navigator.pop(context);
+                    },
+                    child: const Text(
+                      'Убрать категорию',
+                      style: TextStyle(color: Colors.red),
                     ),
-                  ],
-                );
-              },
+                  ),
+              ],
             );
           },
         );

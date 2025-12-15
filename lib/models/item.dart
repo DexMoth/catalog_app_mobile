@@ -3,10 +3,10 @@ import 'category.dart';
 
 class Item {
   final int id;
-  final String name;
-  final String? description;
-  final String? imagePath;
-  final int? parentId;
+  String name;
+  String? description;
+  String? imagePath;
+  int? parentId;
   List<Category>? categories;
   List<Tag>? tags;
 

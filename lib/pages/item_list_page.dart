@@ -23,6 +23,10 @@ class _ItemListPageState extends State<ItemListPage> {
   final ApiService _apiService = ApiService();
   List<Item> _items = [];
   bool _isLoading = true;
+  // что перемещать
+  Item? _itemToMove;
+  // id нового родителя
+  int? _targetParentId;
   String? _error;
 
   // создание страницы
@@ -78,18 +82,18 @@ class _ItemListPageState extends State<ItemListPage> {
       ),
       drawer: const AppDrawer(), // боковое меню
       body: _buildBody(),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: _itemToMove != null
+          ? _buildMoveButtons()
+          : FloatingActionButton(
         onPressed: () {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => EditItemPage(
-                item: null,
-              ),
+              builder: (context) => EditItemPage(item: null),
             ),
           ).then((createdItem) {
             if (createdItem != null) {
-              _loadItems(); // Обновляем список после создания
+              _loadItems();
             }
           });
         },
@@ -164,6 +168,9 @@ class _ItemListPageState extends State<ItemListPage> {
                 ),
               );
             },
+            onLongPress: () {
+              _startMovingItem(item);
+            },
             child: SizedBox(
               height: heightCard,
               child: Row(
@@ -176,7 +183,7 @@ class _ItemListPageState extends State<ItemListPage> {
                   // Текст и иконки
                   Expanded(
                     child: Padding(
-                      padding: const EdgeInsets.all(8.0),
+                      padding: const EdgeInsets.all(3.0),
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -184,12 +191,14 @@ class _ItemListPageState extends State<ItemListPage> {
                           // Название
                           Text(
                             item.name,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                              fontSize: item.name.length > 20 ? 12 : 16, // уменьшаем на 4 если больше 22 символов
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(height: 16), // Отступ
+                          const SizedBox(height: 10), // Отступ
                           // Иконки
                           Row(
                             mainAxisAlignment: MainAxisAlignment.end,
@@ -300,6 +309,82 @@ class _ItemListPageState extends State<ItemListPage> {
       return Container(
         color: Colors.grey[200],
         child: Icon(Icons.photo, color: Colors.grey[400]),
+      );
+    }
+  }
+
+  void _startMovingItem(Item item) {
+    setState(() {
+      _itemToMove = item;
+    });
+  }
+
+  Widget _buildMoveButtons() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        // кнопка перемещения
+        FloatingActionButton(
+          onPressed: () {
+            _moveItemHere(null);
+          },
+          backgroundColor: Colors.green,
+          foregroundColor: Colors.white,
+          child: const Icon(Icons.drive_file_move),
+        ),
+        const SizedBox(height: 10),
+        // Кнопка отмены
+        FloatingActionButton(
+          onPressed: () {
+            setState(() {
+              _itemToMove = null;
+            });
+          },
+          backgroundColor: Colors.red,
+          foregroundColor: Colors.white,
+          child: const Icon(Icons.close),
+        ),
+      ],
+    );
+  }
+
+  // переместить в этого родителя
+  Future<void> _moveItemHere(int? newParentId) async {
+    if (_itemToMove == null) return;
+
+    // меняем родителя
+    final updatedItem = Item(
+      id: _itemToMove!.id,
+      name: _itemToMove!.name,
+      description: _itemToMove!.description,
+      imagePath: _itemToMove!.imagePath,
+      parentId: newParentId,
+      categories: _itemToMove!.categories,
+      tags: _itemToMove!.tags,
+    );
+
+    try {
+      await ApiService().updateItem(updatedItem);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('"${_itemToMove!.name}" перемещен'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      //обновляем список
+      setState(() {
+        _itemToMove = null;
+      });
+      _loadItems();
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка перемещения: $e'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }

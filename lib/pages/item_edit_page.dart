@@ -10,13 +10,13 @@ import 'package:flutter/material.dart';
 import '../models/item.dart';
 import '../services/api_service.dart';
 import '../services/image_service.dart';
-import '../services/gallery_service.dart';
 import 'gallery_page.dart';
 
 class EditItemPage extends StatefulWidget {
   final Item? item;
+  final int? parentId;
 
-  const EditItemPage({super.key, this.item});
+  const EditItemPage({super.key, this.item, this.parentId});
 
   @override
   State<EditItemPage> createState() => _EditItemPageState();
@@ -36,7 +36,16 @@ class _EditItemPageState extends State<EditItemPage> {
   void initState() {
     super.initState();
     _isCreating = widget.item == null;
-    _currentItem = widget.item ?? Item.empty(); // если нулл то пустой
+
+    // если передан parentId
+    if (_isCreating && widget.parentId != null) {
+      _currentItem = Item.empty();
+      _currentItem.parentId = widget.parentId;
+    } else {
+      // Редактируем существующую или создаем без родителя
+      _currentItem = widget.item ?? Item.empty();
+    }
+
     _nameController = TextEditingController(text: _currentItem.name);
     _descriptionController = TextEditingController(text: _currentItem.description);
 
@@ -323,8 +332,6 @@ class _EditItemPageState extends State<EditItemPage> {
       description: _descriptionController.text.trim(),
       imagePath: finalImagePath,
       parentId: _currentItem.parentId,
-      categories: _currentItem.categories,
-      tags: _currentItem.tags,
     );
 
     try {

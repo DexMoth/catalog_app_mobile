@@ -25,8 +25,6 @@ class ApiService {
 
   Future<Item> createItem(Item item) async {
     const url = '$_baseUrl/item';
-    print(item);
-
 
     final response = await http.post(
       Uri.parse(url),

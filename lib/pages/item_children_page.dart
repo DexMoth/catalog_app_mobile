@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../configuration/constants.dart';
 import '../models/item.dart';
 import '../../services/api_service.dart';
+import '../services/image_service.dart';
 import '../widgets/appDrawer.dart';
 import 'item_detail_page.dart';
 import 'item_edit_page.dart';
@@ -22,6 +23,13 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
   final ApiService _apiService = ApiService();
   List<Item> _children = [];
   bool _isLoading = true;
+
+  // что перемещать
+  Item? _itemToMove;
+
+  // id нового родителя
+  int? _targetParentId;
+
   String? _error;
 
   @override
@@ -54,23 +62,46 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(widget.parentItem.name),
-        backgroundColor: Colors.brown,
-        foregroundColor: Colors.white,
-      ),
+        appBar: AppBar(
+          title: Text(widget.parentItem.name),
+          backgroundColor: Colors.brown,
+          foregroundColor: Colors.white,
+        ),
         drawer: const AppDrawer(), // боковое меню
         body: Column(
           children: [
-            _buildBreadcrumbs(),// хлебные крошки
+            _buildBreadcrumbs(), // хлебные крошки
             _buildParent(), // родитель
-            Container(  // отступ
+            Container( // отступ
               height: 1,
             ),
             Expanded(
-              child: _buildChildren(),  // дети
+              child: _buildChildren(), // дети
             ),
           ],
+        ),
+        floatingActionButton: _itemToMove != null
+            ? _buildMoveButtons()
+            : FloatingActionButton(
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) =>
+                    EditItemPage(
+                      item: null,
+                      parentId: widget.parentItem.id,
+                    ),
+              ),
+            ).then((createdItem) {
+              if (createdItem != null) {
+                _loadChildren();
+              }
+            });
+          },
+          backgroundColor: Colors.brown,
+          foregroundColor: Colors.white,
+          child: const Icon(Icons.add),
         )
     );
   }
@@ -130,10 +161,11 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(
-                builder: (context) => ItemChildrenPage(
-                  parentItem: item,
-                  breadcrumbs: newBreadcrumbs,
-                ),
+                builder: (context) =>
+                    ItemChildrenPage(
+                      parentItem: item,
+                      breadcrumbs: newBreadcrumbs,
+                    ),
               ),
             );
           },
@@ -196,22 +228,26 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
               children: [
                 IconButton(
                   icon: const Icon(Icons.remove_red_eye, size: 20),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ItemDetailPage(item: widget.parentItem),
-                    ),
-                  ),
+                  onPressed: () =>
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              ItemDetailPage(item: widget.parentItem),
+                        ),
+                      ),
                   padding: EdgeInsets.zero,
                 ),
                 IconButton(
                   icon: const Icon(Icons.edit, size: 20),
-                  onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => EditItemPage(item: widget.parentItem)
-                      )
-                  ).then((_) => _loadChildren()),
+                  onPressed: () =>
+                      Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                              builder: (context) =>
+                                  EditItemPage(item: widget.parentItem)
+                          )
+                      ).then((_) => _loadChildren()),
                   padding: EdgeInsets.zero,
                 ),
               ],
@@ -228,7 +264,7 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
       itemBuilder: (context, index) {
         final item = _children[index];
         return Card(
-          margin: const EdgeInsets.fromLTRB(15,8,8,8),
+          margin: const EdgeInsets.fromLTRB(15, 8, 8, 8),
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.zero,
           ),
@@ -239,7 +275,8 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
                 PageRouteBuilder(
                   pageBuilder: (context, animation, secAnimation) =>
                       ItemChildrenPage(parentItem: item),
-                  transitionsBuilder: (context, animation, secAnimation, child) {
+                  transitionsBuilder: (context, animation, secAnimation,
+                      child) {
                     return SlideTransition(
                       position: Tween<Offset>(
                         begin: const Offset(1.0, 0.0),
@@ -251,17 +288,17 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
                 ),
               );
             },
+            onLongPress: () {
+              _startMovingItem(item);
+            },
             child: SizedBox(
               height: heightCard,
               child: Row(
                 children: [
                   // Изображение
                   SizedBox(
-                    width: 160,
-                    child: Image.network(
-                      item.imagePath ?? 'http://placehold.jp./300x300.png',
-                      fit: BoxFit.cover,
-                    ),
+                    width: 140,
+                    child: _buildImage(item),
                   ),
                   // Текст и иконки
                   Expanded(
@@ -276,7 +313,9 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
                             item.name,
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: item.name.length > 20 ? 12 : 16, // уменьшаем на 4 если больше 22 символов
+                              fontSize: item.name.length > 20
+                                  ? 12
+                                  : 16, // уменьшаем на 4 если больше 22 символов
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -290,13 +329,14 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => ItemDetailPage(item: item),
+                                      builder: (context) =>
+                                          ItemDetailPage(item: item),
                                     ),
                                   );
                                 },
                                 icon: const Icon(
                                     Icons.remove_red_eye,
-                                    color: Color.fromARGB(255,80,60,20)
+                                    color: Color.fromARGB(255, 80, 60, 20)
                                 ),
                               ),
                               IconButton(
@@ -304,7 +344,8 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
                                   Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                          builder: (context) => EditItemPage(item: item)
+                                          builder: (context) =>
+                                              EditItemPage(item: item, parentId: widget.parentItem.id,)
                                       )
                                   ).then((updatedItem) {
                                     if (updatedItem != null) {
@@ -314,14 +355,15 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
                                 },
                                 icon: const Icon(
                                     Icons.edit,
-                                    color: Color.fromARGB(255,80,60,20)
+                                    color: Color.fromARGB(255, 80, 60, 20)
                                 ),
                               ),
                               IconButton(
                                 onPressed: () {
                                   _showDeleteDialog(item);
                                 },
-                                icon: const Icon(Icons.delete, color: Colors.red),
+                                icon: const Icon(
+                                    Icons.delete, color: Colors.red),
                               ),
                             ],
                           ),
@@ -338,26 +380,122 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
     );
   }
 
+  Widget _buildImage(Item item) {
+    if (item.imagePath != null && item.imagePath!.isNotEmpty) {
+      return ImageService.buildImageFromPath(
+        item.imagePath!,
+        width: 190,
+        height: heightCard,
+        fit: BoxFit.cover,
+      );
+    } else {
+      return Container(
+        color: Colors.grey[200],
+        child: Icon(Icons.photo, color: Colors.grey[400]),
+      );
+    }
+  }
+
   void _showDeleteDialog(Item item) {
     showDialog(
         context: context,
-        builder: (context) => AlertDialog(
-          title: const Text("Удаление"),
-          content: Text("""Вы уверены, что хотите удалить "${item.name}"?"""),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Отмена'),
-            ),
-            TextButton(
-              onPressed: () {
-                // API
-                Navigator.pop(context);
-              },
-              child: const Text('Удалить', style: TextStyle(color: Colors.red),
-              ),
-            ),
-          ],
-        ));
+        builder: (context) =>
+            AlertDialog(
+              title: const Text("Удаление"),
+              content: Text(
+                  """Вы уверены, что хотите удалить "${item.name}"?"""),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Отмена'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    // API
+                    Navigator.pop(context);
+                  },
+                  child: const Text(
+                    'Удалить', style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              ],
+            )
+    );
+  }
+
+  void _startMovingItem(Item item) {
+    setState(() {
+      _itemToMove = item;
+    });
+  }
+
+  Widget _buildMoveButtons() {
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        // кнопка перемещения
+        FloatingActionButton(
+          onPressed: () {
+            _moveItemHere(null);
+          },
+          backgroundColor: Colors.green,
+          foregroundColor: Colors.white,
+          child: const Icon(Icons.drive_file_move),
+        ),
+        const SizedBox(height: 10),
+        // Кнопка отмены
+        FloatingActionButton(
+          onPressed: () {
+            setState(() {
+              _itemToMove = null;
+            });
+          },
+          backgroundColor: Colors.red,
+          foregroundColor: Colors.white,
+          child: const Icon(Icons.close),
+        ),
+      ],
+    );
+  }
+
+  // переместить в этого родителя
+  Future<void> _moveItemHere(int? newParentId) async {
+    if (_itemToMove == null) return;
+
+    // меняем родителя
+    final updatedItem = Item(
+      id: _itemToMove!.id,
+      name: _itemToMove!.name,
+      description: _itemToMove!.description,
+      imagePath: _itemToMove!.imagePath,
+      parentId: newParentId,
+      categories: _itemToMove!.categories,
+      tags: _itemToMove!.tags,
+    );
+
+    try {
+      await ApiService().updateItem(updatedItem);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('"${_itemToMove!.name}" перемещен'),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      //обновляем список
+      setState(() {
+        _itemToMove = null;
+      });
+      _loadChildren();
+
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка перемещения: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 }
