@@ -11,6 +11,7 @@ import '../models/item.dart';
 import '../services/api_service.dart';
 import '../services/image_service.dart';
 import '../services/gallery_service.dart';
+import 'gallery_page.dart';
 
 class EditItemPage extends StatefulWidget {
   final Item? item;
@@ -26,9 +27,8 @@ class _EditItemPageState extends State<EditItemPage> {
   late TextEditingController _nameController;
   late TextEditingController _descriptionController;
   String? _selectedImagePath;
+  String? _selectedImageBase64;
   bool _isCreating = false;
-  File? _selectedImageFile;
-  Uint8List? _selectedImageBytes;
 
   // final GalleryService _galleryService = GalleryService();
 
@@ -39,7 +39,10 @@ class _EditItemPageState extends State<EditItemPage> {
     _currentItem = widget.item ?? Item.empty(); // если нулл то пустой
     _nameController = TextEditingController(text: _currentItem.name);
     _descriptionController = TextEditingController(text: _currentItem.description);
-    _selectedImagePath = _currentItem.imagePath;
+
+    if (_currentItem.imagePath != null && _currentItem.imagePath!.isNotEmpty) {
+      _selectedImageBase64 = _currentItem.imagePath;
+    }
   }
 
   @override
@@ -93,14 +96,6 @@ class _EditItemPageState extends State<EditItemPage> {
   }
 
   Widget _buildImageSection() {
-    String? imageUrl = _selectedImagePath ?? _currentItem.imagePath;
-
-    // является ли это base64 строкой
-    bool isBase64 = imageUrl != null &&
-        (imageUrl.startsWith('data:image/') ||
-            imageUrl.startsWith('base64,') ||
-            imageUrl.length > 1000);
-
     return Column(
       children: [
         Container(
@@ -110,26 +105,7 @@ class _EditItemPageState extends State<EditItemPage> {
             borderRadius: BorderRadius.circular(12),
             color: Colors.grey,
           ),
-          child: imageUrl == null
-              ? Center(
-            child: Icon(
-              Icons.photo,
-              size: 64,
-              color: Colors.grey[400],
-            ),
-          )
-              : isBase64
-              ? Image.memory(
-            // в байты
-            base64Decode(imageUrl.contains(',')
-                ? imageUrl.split(',').last
-                : imageUrl),
-            fit: BoxFit.cover,
-          )
-              : Image.network(
-            imageUrl,
-            fit: BoxFit.cover
-          ),
+          child: _buildImagePreview(),
         ),
         const SizedBox(height: 16),
         Row(
@@ -137,14 +113,13 @@ class _EditItemPageState extends State<EditItemPage> {
           children: [
             ElevatedButton.icon(
               onPressed: () {
-                // TODO: Выбрать из галереи
                 print('Выбрать из галереи');
                 _selectFromGallery();
               },
               icon: const Icon(Icons.photo_library),
               label: const Text('Галерея'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue,
+                backgroundColor: Colors.brown,
                 foregroundColor: Colors.white,
               ),
             ),
@@ -156,13 +131,65 @@ class _EditItemPageState extends State<EditItemPage> {
               icon: const Icon(Icons.camera_alt),
               label: const Text('Камера'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
+                backgroundColor: Colors.brown,
                 foregroundColor: Colors.white,
               ),
             ),
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildImagePreview() {
+    if (_selectedImagePath != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.file(
+          File(_selectedImagePath!),
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            print('Ошибка загрузки файла: $error');
+            return _buildFallbackImage();
+          },
+        ),
+      );
+    }
+
+    if (_selectedImageBase64 != null && _selectedImageBase64!.isNotEmpty) {
+      return _buildBase64Image(_selectedImageBase64!);
+    }
+
+    // Если нет изображения
+    return _buildFallbackImage();
+  }
+
+  Widget _buildBase64Image(String base64String) {
+    try {
+      final cleanBase64 = base64String.contains(',')
+          ? base64String.split(',').last
+          : base64String;
+      final bytes = base64Decode(cleanBase64);
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.memory(
+          bytes,
+          fit: BoxFit.cover,
+        ),
+      );
+    } catch (e) {
+      print('Ошибка декодирования base64: $e');
+      return _buildFallbackImage();
+    }
+  }
+
+  Widget _buildFallbackImage() {
+    return Center(
+      child: Icon(
+        Icons.photo,
+        size: 64,
+        color: Colors.grey[400],
+      ),
     );
   }
 
@@ -270,20 +297,27 @@ class _EditItemPageState extends State<EditItemPage> {
     // картинка
     String? finalImagePath = _currentItem.imagePath;
 
+    //если новое фото
     if (_selectedImagePath != null) {
       try {
         // Читаем файл и конвертируем в base64
         final file = File(_selectedImagePath!);
-        final bytes = await file.readAsBytes();
-        final base64Image = base64Encode(bytes);
-        finalImagePath = base64Image;
+        if (await file.exists()) {
+          final base64Image = ImageService.imageFileToBase64(file);
+          if (base64Image != null) {
+            finalImagePath = base64Image;
+            _selectedImageBase64 = base64Image;
+          } else {
+            throw Exception('Не удалось конвертировать изображение');
+          }
+        }
       } catch (e) {
         print('Ошибка конвертации изображения: $e');
         finalImagePath = _currentItem.imagePath;
       }
     }
 
-    final updatedItem  = Item(
+    final updatedItem = Item(
       id: _isCreating ? 0 : _currentItem.id,
       name: newName,
       description: _descriptionController.text.trim(),
@@ -314,77 +348,55 @@ class _EditItemPageState extends State<EditItemPage> {
       _showErrorDialog('Ошибка сохранения: $e');
     } finally {
       //if (mounted) {
-        //setState(() {
-        //  _isLoading = false;
-        //});
-     // }
+      //setState(() {
+      //  _isLoading = false;
+      //});
+      // }
     }
   }
 
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Ошибка'),
-        content: Text(message),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
+      builder: (context) =>
+          AlertDialog(
+            title: const Text('Ошибка'),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
           ),
-        ],
-      ),
     );
   }
 
   Future<void> _selectFromGallery() async {
-    // final files = await GalleryPicker.pickMedia(
-    //   context: context,
-    //   singleMedia: true,
-    //   config: Config(
-    //     mode: Mode.light,
-    //     recents: "Недавние",
-    //     gallery: "Галерея",
-    //     tapPhotoSelect: "Нажмите для выбора",
-    //   ),
-    // );
-    //
-    // if (files?.isNotEmpty ?? false) {
-    //   final file = await files!.first.file;
-    //   if (file != null) {
-    //     setState(() {
-    //       _selectedImageBytes = file.readAsBytesSync();
-    //       _selectedImagePath = file.path;
-    //     });
-    //   }
-    // }
-  }
-
-  Future<void> _takePhoto() async {
-    File? _selectedImageFile;
-
-    final photoPath = await Navigator.push<String?>(
+    final result = await Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => const TakePhotoPage(),
-    ),);
-    print('Сделать фото');
+      MaterialPageRoute(builder: (context) => GalleryPage()),
+    );
 
-    // есть фото
-    if (photoPath != null && mounted) {
-      final imageFile = File(photoPath);
+    // путь
+    if (result != null && result is String) {
       setState(() {
-        _selectedImageFile = imageFile;
-        // превьюшка
-        _selectedImagePath = photoPath;
+        _selectedImagePath = result;
       });
     }
   }
 
+  Future<void> _takePhoto() async {
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => TakePhotoPage()),
+    );
 
-  void _removeImage() {
-    setState(() {
-      _selectedImagePath = null;
-    });
+    // путь к фото
+    if (result != null && result is String) {
+      setState(() {
+        _selectedImagePath = result;
+      });
+    }
   }
 }

@@ -8,7 +8,7 @@ import '../models/item.dart';
 
 class ApiService {
   static final Dio _dio = Dio();
-  static const String _baseUrl = 'http://192.168.0.12:8080/api';
+  static const String _baseUrl = 'http://192.168.0.13:8080/api';
 
   Future<List<Item>> getItems({String searchQuery = ''}) async {
 
@@ -34,8 +34,8 @@ class ApiService {
       body: json.encode({
         'name': item.name,
         'description': item.description,
-        'image_path': item.imagePath,
-        'parent_id': item.parentId,
+        'imagePath': item.imagePath,
+        'parentId': item.parentId,
         'categories': item.categories,
         'tags': item.tags,
       }),
@@ -60,8 +60,8 @@ class ApiService {
         body: json.encode({
           'name': item.name,
           'description': item.description,
-          'image_path': item.imagePath,
-          'parent_id': item.parentId,
+          'imagePath': item.imagePath,
+          'parentId': item.parentId,
           'categories': item.categories,
           'tags': item.tags,
         }),

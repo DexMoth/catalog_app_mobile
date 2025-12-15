@@ -55,28 +55,28 @@ class AppDrawer extends StatelessWidget {
               );
             },
           ),
-          ListTile(
-            leading: const Icon(Icons.door_front_door, color: Colors.brown),
-            title: const Text('Войти в аккаунт'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => LoginPage()),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.app_registration, color: Colors.brown),
-            title: const Text('Регистрация'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => RegistrationPage()),
-              );
-            },
-          ),
+          // ListTile(
+          //   leading: const Icon(Icons.door_front_door, color: Colors.brown),
+          //   title: const Text('Войти в аккаунт'),
+          //   onTap: () {
+          //     Navigator.pop(context);
+          //     Navigator.push(
+          //       context,
+          //       MaterialPageRoute(builder: (context) => LoginPage()),
+          //     );
+          //   },
+          // ),
+          // ListTile(
+          //   leading: const Icon(Icons.app_registration, color: Colors.brown),
+          //   title: const Text('Регистрация'),
+          //   onTap: () {
+          //     Navigator.pop(context);
+          //     Navigator.push(
+          //       context,
+          //       MaterialPageRoute(builder: (context) => RegistrationPage()),
+          //     );
+          //   },
+          // ),
         ],
       ),
     );

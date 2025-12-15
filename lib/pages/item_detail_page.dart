@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:catalog_app_mobile/models/category.dart';
+import 'package:catalog_app_mobile/services/image_service.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart';
 import '../models/item.dart';
@@ -89,10 +93,44 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
           borderRadius: BorderRadius.circular(12),
           color: Colors.grey[200],
         ),
-        child: Image.network(
-          _currentItem.imagePath ?? 'http://placehold.jp./300x300.png',
+        child: _buildImagePreview(),
+      ),
+    );
+  }
+
+  Widget _buildImagePreview() {
+    if (_currentItem.imagePath == null || _currentItem.imagePath!.isEmpty) {
+      return _buildFallbackImage();
+    }
+
+    final imagePath = _currentItem.imagePath!;
+
+    // Проверяем, является ли строка base64
+    final isBase64 = imagePath.contains('base64,') ||
+        imagePath.startsWith('data:image/') ||
+        (imagePath.length > 100 && !imagePath.startsWith('http') && !imagePath.startsWith('/'));
+
+    final bytes = ImageService.decodeBase64(imagePath);
+
+    if (bytes != null) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: Image.memory(
+          bytes,
           fit: BoxFit.cover,
         ),
+      );
+    } else {
+      return _buildFallbackImage();
+    }
+  }
+
+  Widget _buildFallbackImage() {
+    return Center(
+      child: Icon(
+        Icons.photo,
+        size: 64,
+        color: Colors.grey[400],
       ),
     );
   }

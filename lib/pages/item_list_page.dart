@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 
 import '../configuration/constants.dart';
 import '../models/item.dart';
+import '../services/image_service.dart';
 import '../widgets/appDrawer.dart';
 import 'item_detail_page.dart';
 
@@ -170,10 +171,7 @@ class _ItemListPageState extends State<ItemListPage> {
                   // Изображение
                   SizedBox(
                     width: 190,
-                    child: Image.network(
-                      item.imagePath ?? 'http://placehold.jp./300x300.png',
-                      fit: BoxFit.cover,
-                    ),
+                    child: _buildImage(item),
                   ),
                   // Текст и иконки
                   Expanded(
@@ -286,6 +284,22 @@ class _ItemListPageState extends State<ItemListPage> {
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Ошибка удаления: $e')),
+      );
+    }
+  }
+
+  Widget _buildImage(Item item) {
+    if (item.imagePath != null && item.imagePath!.isNotEmpty) {
+      return ImageService.buildImageFromPath(
+        item.imagePath!,
+        width: 190,
+        height: heightCard,
+        fit: BoxFit.cover,
+      );
+    } else {
+      return Container(
+        color: Colors.grey[200],
+        child: Icon(Icons.photo, color: Colors.grey[400]),
       );
     }
   }
