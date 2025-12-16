@@ -1,6 +1,3 @@
-import 'dart:convert';
-import 'dart:io';
-
 import 'package:catalog_app_mobile/models/category.dart';
 import 'package:catalog_app_mobile/services/image_service.dart';
 import 'package:flutter/material.dart';
@@ -21,11 +18,22 @@ class ItemDetailPage extends StatefulWidget  {
 
 class _ItemDetailPageState extends State<ItemDetailPage>{
   late Item _currentItem;
+  bool _hasChanges = false;
 
   @override
   void initState() {
     super.initState();
     _currentItem = widget.item;
+  }
+
+  @override
+  // закрытие
+  void dispose() {
+    // сохраняем изменения
+    if (_hasChanges) {
+      _saveChanges();
+    }
+    super.dispose();
   }
 
   @override
@@ -423,6 +431,14 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
     );
   }
 
+  Future<void> _saveChanges() async {
+    try {
+      await ApiService().updateItem(_currentItem);
+    } catch (e) {
+      print("ошибка");
+    }
+  }
+
   // переключение состояния тега
   void _toggleTag(Tag tag) {
     setState(() {
@@ -440,6 +456,7 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
         // добавляем тег если не привязан
         _currentItem.tags = [...currentTags, tag];
       }
+      _hasChanges = true;
     });
   }
 
@@ -583,6 +600,7 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
                             // Выбираем новую
                             _currentItem.categories = [category];
                           }
+                          _hasChanges = true;
                         });
                         Navigator.pop(context);
                       },

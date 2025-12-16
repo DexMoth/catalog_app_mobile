@@ -10,6 +10,7 @@ import '../configuration/constants.dart';
 import '../models/item.dart';
 import '../services/image_service.dart';
 import '../widgets/appDrawer.dart';
+import '../widgets/move_dialog.dart';
 import 'item_detail_page.dart';
 
 class ItemListPage extends StatefulWidget {
@@ -169,7 +170,7 @@ class _ItemListPageState extends State<ItemListPage> {
               );
             },
             onLongPress: () {
-              _startMovingItem(item);
+              showMoveDialog(item);
             },
             child: SizedBox(
               height: heightCard,
@@ -315,12 +316,6 @@ class _ItemListPageState extends State<ItemListPage> {
     }
   }
 
-  void _startMovingItem(Item item) {
-    setState(() {
-      _itemToMove = item;
-    });
-  }
-
   Widget _buildMoveButtons() {
     return Column(
       mainAxisAlignment: MainAxisAlignment.end,
@@ -389,5 +384,17 @@ class _ItemListPageState extends State<ItemListPage> {
         ),
       );
     }
+  }
+
+  void showMoveDialog(Item item) {
+    showDialog(
+      context: context,
+      builder: (context) => MoveDialog(
+        itemToMove: item,
+        onMoveComplete: () {
+          _loadItems();
+        },
+      ),
+    );
   }
 }

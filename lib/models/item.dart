@@ -59,4 +59,16 @@ class Item {
       tags: tags,
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'description': description,
+      'imagePath': imagePath,
+      'parentId': parentId,
+      'categories': categories?.map((category) => category.toJson()).toList(),
+      'tags': tags?.map((tag) => tag.toJson()).toList(),
+    };
+  }
 }

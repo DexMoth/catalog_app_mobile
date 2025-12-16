@@ -12,7 +12,13 @@ class ApiService {
 
   Future<List<Item>> getItems({String searchQuery = ''}) async {
 
-    const url = '$_baseUrl/item';
+    var url = '$_baseUrl/item';
+
+    if (searchQuery.isNotEmpty) {
+      final query = Uri.encodeQueryComponent(searchQuery);
+      url += '?search=$query';
+    }
+
     final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
