@@ -4,7 +4,9 @@ import '../configuration/constants.dart';
 import '../models/item.dart';
 import '../../services/api_service.dart';
 import '../services/image_service.dart';
+import '../services/move_service.dart';
 import '../widgets/appDrawer.dart';
+import '../widgets/move_dialog.dart';
 import 'item_detail_page.dart';
 import 'item_edit_page.dart';
 import 'item_list_page.dart';
@@ -252,6 +254,7 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
                 ),
               ],
             ),
+
           ],
         ),
       ),
@@ -289,7 +292,7 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
               );
             },
             onLongPress: () {
-              _startMovingItem(item);
+              showMoveDialog(item);
             },
             child: SizedBox(
               height: heightCard,
@@ -399,28 +402,44 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
   void _showDeleteDialog(Item item) {
     showDialog(
         context: context,
-        builder: (context) =>
-            AlertDialog(
-              title: const Text("Удаление"),
-              content: Text(
-                  """Вы уверены, что хотите удалить "${item.name}"?"""),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Отмена'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    // API
-                    Navigator.pop(context);
-                  },
-                  child: const Text(
-                    'Удалить', style: TextStyle(color: Colors.red),
-                  ),
-                ),
-              ],
-            )
+        builder: (context) => AlertDialog(
+          title: const Text("Удаление"),
+          content: Text("""Вы уверены, что хотите удалить "${item.name}"?"""),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Отмена'),
+            ),
+            TextButton(
+              onPressed: () {
+                _confirmDelete(item);
+              },
+              child: const Text('Удалить', style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        )
     );
+  }
+
+
+  void _confirmDelete(Item item) async {
+    try {
+      final success = await ApiService().deleteItem(item.id);
+      if (success) {
+        Navigator.pop(context); // убрираем диалог
+        setState(() {
+          _children.removeWhere((i) => i.id == item.id);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Элемент удален')),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка удаления: $e')),
+      );
+    }
   }
 
   void _startMovingItem(Item item) {
@@ -498,4 +517,17 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
       );
     }
   }
+
+  void showMoveDialog(Item item) {
+    showDialog(
+      context: context,
+      builder: (context) => MoveDialog(
+        itemToMove: item,
+        onMoveComplete: () {
+          _loadChildren();
+        },
+      ),
+    );
+  }
+
 }

@@ -44,7 +44,7 @@ class _ItemListPageState extends State<ItemListPage> {
     });
 
     try {
-      final items = await _apiService.getItems();
+      final items = await _apiService.getItemsWithoutParent();
       final rootItems = items.where((item) => item.parentId == null).toList();
       // потом сделать эндпоинт
       //print(items);
@@ -285,7 +285,9 @@ class _ItemListPageState extends State<ItemListPage> {
       final success = await ApiService().deleteItem(item.id);
       if (success) {
         Navigator.pop(context); // убрираем диалог
-        Navigator.pop(context, true); // вернуться назад
+        setState(() {
+          _items.removeWhere((i) => i.id == item.id);
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Элемент удален')),
         );

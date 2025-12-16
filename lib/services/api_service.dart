@@ -128,6 +128,18 @@ class ApiService {
     }
   }
 
+  Future<List<Item>> getItemsWithoutParent() async {
+    const url = '$_baseUrl/item/roots';
+    final response = await http.get(Uri.parse(url));
+
+    if (response.statusCode == 200) {
+      final List<dynamic> jsonList = json.decode(response.body);
+      return jsonList.map((json) => Item.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to load items: ${response.statusCode}');
+    }
+  }
+
   Future<bool> deleteItem(int itemId) async {
     const url = '$_baseUrl/item';
 
