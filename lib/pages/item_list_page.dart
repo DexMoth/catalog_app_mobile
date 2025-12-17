@@ -14,7 +14,9 @@ import '../widgets/move_dialog.dart';
 import 'item_detail_page.dart';
 
 class ItemListPage extends StatefulWidget {
-  const ItemListPage({super.key});
+  final ApiService? apiService;
+
+  const ItemListPage({super.key, this.apiService});
 
   @override
   State<ItemListPage> createState() => _ItemListPageState();

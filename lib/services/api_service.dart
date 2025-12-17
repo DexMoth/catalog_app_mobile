@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:ffi';
+
 import 'package:catalog_app_mobile/models/category.dart';
 import 'package:catalog_app_mobile/models/tag.dart';
 import 'package:dio/dio.dart';
@@ -8,7 +8,7 @@ import '../models/item.dart';
 
 class ApiService {
   static final Dio _dio = Dio();
-  static const String _baseUrl = 'http://192.168.0.13:8080/api';
+  static const String _baseUrl = 'http://192.168.0.10:8080/api';
 
   Future<List<Item>> getItems({String searchQuery = ''}) async {
 
