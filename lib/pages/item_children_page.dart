@@ -68,11 +68,16 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
           title: Text(widget.parentItem.name),
           backgroundColor: Colors.brown,
           foregroundColor: Colors.white,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back),
+            onPressed: () {
+              Navigator.pop(context);
+            },
+          ),
         ),
         drawer: const AppDrawer(), // боковое меню
         body: Column(
           children: [
-            _buildBreadcrumbs(), // хлебные крошки
             _buildParent(), // родитель
             Container( // отступ
               height: 1,
@@ -105,105 +110,6 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
           foregroundColor: Colors.white,
           child: const Icon(Icons.add),
         )
-    );
-  }
-
-  // метод для хлебных крошек (полного пути)
-  Widget _buildBreadcrumbs() {
-    // создаем путь
-    final breadcrumbs = widget.breadcrumbs ?? [];
-    final currentBreadcrumbs = [...breadcrumbs, widget.parentItem];
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      color: Colors.grey[100],
-      child: Row(
-        children: [
-          // Главная страница
-          _buildBreadcrumbItem(
-            text: 'Главная',
-            isLast: false,
-            onTap: () {
-              // Возвращаемся на главную
-              Navigator.pushAndRemoveUntil(
-                context,
-                MaterialPageRoute(builder: (context) => const ItemListPage()),
-                    (route) => false,
-              );
-            },
-          ),
-
-          // Разделитель
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 2),
-            child: Icon(Icons.chevron_right, size: 16, color: Colors.grey),
-          ),
-
-          // Промежуточные элементы
-          ..._buildBreadcrumbItems(currentBreadcrumbs),
-        ],
-      ),
-    );
-  }
-
-  List<Widget> _buildBreadcrumbItems(List<Item> breadcrumbs) {
-    final widgets = <Widget>[];
-
-    for (int i = 0; i < breadcrumbs.length; i++) {
-      final item = breadcrumbs[i];
-      final isLast = i == breadcrumbs.length - 1;
-
-      widgets.add(
-        _buildBreadcrumbItem(
-          text: item.name,
-          isLast: isLast,
-          onTap: isLast ? null : () {
-            // Находим индекс текущего элемента и обрезаем массив
-            final newBreadcrumbs = breadcrumbs.sublist(0, i);
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) =>
-                    ItemChildrenPage(
-                      parentItem: item,
-                      breadcrumbs: newBreadcrumbs,
-                    ),
-              ),
-            );
-          },
-        ),
-      );
-
-      // Добавляем разделитель, если не последний
-      if (!isLast) {
-        widgets.add(
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 8),
-            child: Icon(Icons.chevron_right, size: 16, color: Colors.grey),
-          ),
-        );
-      }
-    }
-
-    return widgets;
-  }
-
-  Widget _buildBreadcrumbItem({
-    required String text,
-    required bool isLast,
-    VoidCallback? onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 10,
-          color: isLast ? Colors.brown : Colors.blue,
-          fontWeight: isLast ? FontWeight.bold : FontWeight.normal,
-          decoration: isLast ? null : TextDecoration.underline,
-        ),
-      ),
     );
   }
 
@@ -316,7 +222,7 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
                             item.name,
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: item.name.length > 20
+                              fontSize: item.name.length > 18
                                   ? 12
                                   : 16, // уменьшаем на 4 если больше 22 символов
                             ),

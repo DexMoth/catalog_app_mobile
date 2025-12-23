@@ -196,7 +196,7 @@ class _ItemListPageState extends State<ItemListPage> {
                             item.name,
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: item.name.length > 20 ? 12 : 16, // уменьшаем на 4 если больше 22 символов
+                              fontSize: item.name.length > 18 ? 12 : 16, // уменьшаем на 4 если больше 22 символов
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
