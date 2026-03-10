@@ -7,8 +7,10 @@ import 'package:catalog_app_mobile/services/camera_service.dart';
 import 'package:flutter/material.dart';
 // import 'package:gallery_picker/gallery_picker.dart';
 // import 'package:gallery_picker/models/media_file.dart';
+import '../models/category.dart';
 import '../models/item.dart';
 import '../services/api_service.dart';
+import '../services/image_classifier_service .dart';
 import '../services/image_service.dart';
 import 'gallery_page.dart';
 
@@ -29,6 +31,11 @@ class _EditItemPageState extends State<EditItemPage> {
   String? _selectedImagePath;
   String? _selectedImageBase64;
   bool _isCreating = false;
+  // иишка
+  late ImageClassifierService _classifierService;
+  Category? _suggestedCategory;
+  // категории
+  bool _hasChanges = false; // Флаг изменений для категории
 
   // final GalleryService _galleryService = GalleryService();
 
@@ -36,6 +43,7 @@ class _EditItemPageState extends State<EditItemPage> {
   void initState() {
     super.initState();
     _isCreating = widget.item == null;
+    _classifierService = ImageClassifierService();
 
     // если передан parentId
     if (_isCreating && widget.parentId != null) {
@@ -58,6 +66,7 @@ class _EditItemPageState extends State<EditItemPage> {
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
+    _classifierService = ImageClassifierService();
     super.dispose();
   }
 
@@ -84,8 +93,11 @@ class _EditItemPageState extends State<EditItemPage> {
             // КАРТИНКА
             _buildImageSection(),
 
-            const SizedBox(height: 24),
+            const SizedBox(height: 8),
 
+            _buildCategories(context),
+            _buildCategorySuggestionWidget(),
+            const SizedBox(height: 24),
             // НАЗВАНИЕ
             _buildNameField(),
 
@@ -332,6 +344,7 @@ class _EditItemPageState extends State<EditItemPage> {
       description: _descriptionController.text.trim(),
       imagePath: finalImagePath,
       parentId: _currentItem.parentId,
+      categories: _currentItem.categories,
     );
 
     try {
@@ -390,6 +403,8 @@ class _EditItemPageState extends State<EditItemPage> {
       setState(() {
         _selectedImagePath = result;
       });
+      // предложение категорий
+      await _findCategoryForImage(File(result));
     }
   }
 
@@ -404,6 +419,224 @@ class _EditItemPageState extends State<EditItemPage> {
       setState(() {
         _selectedImagePath = result;
       });
+      // предложение категорий
+      await _findCategoryForImage(File(result));
     }
+  }
+
+  Widget _buildCategories(BuildContext context) {
+    final itemCategories = _currentItem.categories ?? [];
+
+    return SizedBox(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 6,
+            runSpacing: 1,
+            children: [
+
+              if (itemCategories.isNotEmpty)
+                Chip(
+                  label: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          itemCategories.first.name,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        GestureDetector(
+                          onTap: () {
+                            // Удаляем категорию при нажатии на крестик
+                            setState(() {
+                              _currentItem.categories = [];
+                            });
+                          },
+                          child: const Icon(
+                            Icons.close,
+                            size: 14,
+                            color: Colors.brown,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  backgroundColor: Colors.brown.withOpacity(0.1),
+                  labelStyle: const TextStyle(color: Colors.brown),
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                ),
+              if (itemCategories.isEmpty)
+                const Text(
+                  'Категория не выбрана',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontStyle: FontStyle.italic,
+                    fontSize: 12,
+                  ),
+                ),
+              IconButton(
+                onPressed: () {
+                  _showDialogAddCategory(context);
+                },
+                icon: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.brown.withOpacity(0.3)),
+                  ),
+                  child: Icon(
+                    itemCategories.isEmpty ? Icons.add : Icons.edit,
+                    size: 18,
+                    color: Colors.brown,
+                  ),
+                ),
+                padding: EdgeInsets.zero,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDialogAddCategory(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return FutureBuilder<List<Category>>(
+          future: ApiService().getCategories(),
+          builder: (context, snapshot) {
+            final categories = snapshot.data ?? [];
+            final currentCategory = _currentItem.categories?.isNotEmpty == true
+                ? _currentItem.categories!.first
+                : null;
+
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            return AlertDialog(
+              title: const Text('Выберите категорию'),
+              content: SizedBox(
+                width: double.maxFinite,
+                height: 300,
+                child: ListView.builder(
+                  itemCount: categories.length,
+                  itemBuilder: (context, index) {
+                    final category = categories[index];
+                    final isSelected = currentCategory?.id == category.id;
+
+                    return ListTile(
+                      title: Text(category.name),
+                      trailing: isSelected ? const Icon(Icons.check, color: Colors.brown) : null,
+                      onTap: () {
+                        setState(() {
+                          if (isSelected) {
+                            // Если уже выбрана - убираем
+                            _currentItem.categories = [];
+                          } else {
+                            // Выбираем новую
+                            _currentItem.categories = [category];
+                          }
+                          _hasChanges = true;
+                        });
+                        Navigator.pop(context);
+                      },
+                    );
+                  },
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Отмена'),
+                ),
+                if (currentCategory != null)
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _currentItem.categories = [];
+                      });
+                      Navigator.pop(context);
+                    },
+                    child: const Text(
+                      'Убрать категорию',
+                      style: TextStyle(color: Colors.red),
+                    ),
+                  ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _findCategoryForImage(File image) async {
+    final category = await _classifierService.findCategory(image);
+
+    if (category != null && mounted) {
+      setState(() => _suggestedCategory = category);
+
+      setState(() {
+        _currentItem.categories = [category];
+        _hasChanges = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Выбрана категория: ${category.name}'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Widget _buildCategorySuggestionWidget() {
+    if (_suggestedCategory == null) return SizedBox.shrink();
+
+    final current = _currentItem.categories?.firstOrNull;
+    final isSelected = current?.id == _suggestedCategory!.id;
+
+    return Container(
+      margin: EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.brown.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.brown.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.auto_awesome, size: 16, color: Colors.brown),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Предложена категория: "${_suggestedCategory!.name}"',
+              style: TextStyle(color: Colors.brown),
+            ),
+          ),
+          if (!isSelected)
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _currentItem.categories = [_suggestedCategory!];
+                  _hasChanges = true;
+                });
+              },
+              style: TextButton.styleFrom(padding: EdgeInsets.zero),
+              child: Text('Выбрать', style: TextStyle(color: Colors.brown)),
+            ),
+        ],
+      ),
+    );
   }
 }

@@ -7,7 +7,9 @@ import '../models/tag.dart';
 import '../widgets/appDrawer.dart';
 
 class TagListPage extends StatefulWidget {
-  const TagListPage({super.key});
+  final ApiService? apiService;
+
+  const TagListPage({super.key, this.apiService});
 
   @override
   State<TagListPage> createState() => _TagListPageState();

@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:ffi';
+
 import 'package:catalog_app_mobile/models/category.dart';
 import 'package:catalog_app_mobile/models/tag.dart';
 import 'package:dio/dio.dart';
@@ -8,11 +8,17 @@ import '../models/item.dart';
 
 class ApiService {
   static final Dio _dio = Dio();
-  static const String _baseUrl = 'http://192.168.0.13:8080/api';
+  static const String _baseUrl = 'http://192.168.0.10:8080/api';
 
   Future<List<Item>> getItems({String searchQuery = ''}) async {
 
-    const url = '$_baseUrl/item';
+    var url = '$_baseUrl/item';
+
+    if (searchQuery.isNotEmpty) {
+      final query = Uri.encodeQueryComponent(searchQuery);
+      url += '?search=$query';
+    }
+
     final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
@@ -125,6 +131,18 @@ class ApiService {
     return jsonList.map((json) => Item.fromJson(json)).toList();
     } else {
     throw Exception('Failed to load items: ${response.statusCode}');
+    }
+  }
+
+  Future<List<Item>> getItemsWithoutParent() async {
+    const url = '$_baseUrl/item/roots';
+    final response = await http.get(Uri.parse(url));
+
+    if (response.statusCode == 200) {
+      final List<dynamic> jsonList = json.decode(response.body);
+      return jsonList.map((json) => Item.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to load items: ${response.statusCode}');
     }
   }
 

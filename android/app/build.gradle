@@ -6,6 +6,12 @@ plugins {
 }
 
 android {
+    compileSdkVersion  = 35
+    defaultConfig {
+        minSdkVersion 21
+        targetSdkVersion 35
+    }
+
     namespace = "com.example.catalog_app_mobile"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion

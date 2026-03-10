@@ -10,10 +10,13 @@ import '../configuration/constants.dart';
 import '../models/item.dart';
 import '../services/image_service.dart';
 import '../widgets/appDrawer.dart';
+import '../widgets/move_dialog.dart';
 import 'item_detail_page.dart';
 
 class ItemListPage extends StatefulWidget {
-  const ItemListPage({super.key});
+  final ApiService? apiService;
+
+  const ItemListPage({super.key, this.apiService});
 
   @override
   State<ItemListPage> createState() => _ItemListPageState();
@@ -44,7 +47,7 @@ class _ItemListPageState extends State<ItemListPage> {
     });
 
     try {
-      final items = await _apiService.getItems();
+      final items = await _apiService.getItemsWithoutParent();
       final rootItems = items.where((item) => item.parentId == null).toList();
       // потом сделать эндпоинт
       //print(items);
@@ -169,7 +172,7 @@ class _ItemListPageState extends State<ItemListPage> {
               );
             },
             onLongPress: () {
-              _startMovingItem(item);
+              showMoveDialog(item);
             },
             child: SizedBox(
               height: heightCard,
@@ -193,7 +196,7 @@ class _ItemListPageState extends State<ItemListPage> {
                             item.name,
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              fontSize: item.name.length > 20 ? 12 : 16, // уменьшаем на 4 если больше 22 символов
+                              fontSize: item.name.length > 18 ? 12 : 16, // уменьшаем на 4 если больше 22 символов
                             ),
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
@@ -285,7 +288,9 @@ class _ItemListPageState extends State<ItemListPage> {
       final success = await ApiService().deleteItem(item.id);
       if (success) {
         Navigator.pop(context); // убрираем диалог
-        Navigator.pop(context, true); // вернуться назад
+        setState(() {
+          _items.removeWhere((i) => i.id == item.id);
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Элемент удален')),
         );
@@ -311,12 +316,6 @@ class _ItemListPageState extends State<ItemListPage> {
         child: Icon(Icons.photo, color: Colors.grey[400]),
       );
     }
-  }
-
-  void _startMovingItem(Item item) {
-    setState(() {
-      _itemToMove = item;
-    });
   }
 
   Widget _buildMoveButtons() {
@@ -387,5 +386,17 @@ class _ItemListPageState extends State<ItemListPage> {
         ),
       );
     }
+  }
+
+  void showMoveDialog(Item item) {
+    showDialog(
+      context: context,
+      builder: (context) => MoveDialog(
+        itemToMove: item,
+        onMoveComplete: () {
+          _loadItems();
+        },
+      ),
+    );
   }
 }
