@@ -1,18 +1,25 @@
 import 'dart:convert';
 
-import 'package:catalog_app_mobile/models/category.dart';
+import 'package:catalog_app_mobile/models/reminder.dart';
 import 'package:catalog_app_mobile/models/tag.dart';
 import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
+import '../models/category.dart';
 import '../models/item.dart';
+import 'package:catalog_app_mobile/configuration/app_config.dart';
 
 class ApiService {
-  static final Dio _dio = Dio();
-  static const String _baseUrl = 'http://192.168.0.10:8080/api';
+  // временный userId для тестирования
+  static const int _currentUserId = 2;
+
+  // вспомогательный метод для добавления userId к URL
+  String _urlWithUserId(String path) {
+    return '$baseUrl$path?userId=$_currentUserId';
+  }
 
   Future<List<Item>> getItems({String searchQuery = ''}) async {
 
-    var url = '$_baseUrl/item';
+    var url = _urlWithUserId('/item');
 
     if (searchQuery.isNotEmpty) {
       final query = Uri.encodeQueryComponent(searchQuery);
@@ -30,7 +37,7 @@ class ApiService {
   }
 
   Future<Item> createItem(Item item) async {
-    const url = '$_baseUrl/item';
+    var url = _urlWithUserId('/item');
 
     final response = await http.post(
       Uri.parse(url),
@@ -42,6 +49,7 @@ class ApiService {
         'parentId': item.parentId,
         'categories': item.categories,
         'tags': item.tags,
+        'userId': _currentUserId,
       }),
     );
 
@@ -53,11 +61,11 @@ class ApiService {
   }
 
   Future<Item> updateItem(Item item) async {
-    const url = '$_baseUrl/item';
+    var url = _urlWithUserId('/item/${item.id}');
 
     try {
       final response = await http.put(
-        Uri.parse('$url/${item.id}'),
+        Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
         },
@@ -86,11 +94,11 @@ class ApiService {
 
   // обновление только тегов
   Future<void> updateItemTags(int itemId, List<int> tags) async {
-    const url = '$_baseUrl/item';
+    var url = _urlWithUserId('/item/$itemId/tags');
 
     try {
       final response = await http.patch(
-        Uri.parse('$url/${itemId}/tags'),
+        Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'tags': tags}),
       );
@@ -105,11 +113,11 @@ class ApiService {
 
   // обновление только категорий
   Future<void> updateItemCategories(int itemId, List<int> categories) async {
-    const url = '$_baseUrl/item';
+    var url = _urlWithUserId('/item/$itemId/categories');
 
     try {
       final response = await http.patch(
-        Uri.parse('$url/${itemId}/categories'),
+        Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({'categories': categories}),
       );
@@ -123,7 +131,7 @@ class ApiService {
   }
 
   Future<List<Item>> getChildrenItems(int parentId) async {
-    final url = '$_baseUrl/item/$parentId/children';
+    final url = _urlWithUserId('/item/$parentId/children');
     final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
@@ -135,7 +143,7 @@ class ApiService {
   }
 
   Future<List<Item>> getItemsWithoutParent() async {
-    const url = '$_baseUrl/item/roots';
+    var url = _urlWithUserId('/item/roots');
     final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
@@ -147,11 +155,11 @@ class ApiService {
   }
 
   Future<bool> deleteItem(int itemId) async {
-    const url = '$_baseUrl/item';
+   var url = _urlWithUserId('/item/$itemId');
 
     try {
       final response = await http.delete(
-        Uri.parse('$url/$itemId'),
+        Uri.parse(url),
       );
 
       if (response.statusCode == 200 || response.statusCode == 204) {
@@ -169,7 +177,7 @@ class ApiService {
 
   ///////////////// ТЕГИ //////////////
   Future<List<Tag>> getTags() async {
-    const url = '$_baseUrl/tag';
+    final url = _urlWithUserId('/tag');
 
     final response = await http.get(Uri.parse(url));
 
@@ -182,12 +190,15 @@ class ApiService {
   }
 
   Future<Tag> createTag(String name) async {
-    const url = '$_baseUrl/tag';
+    final url = _urlWithUserId('/tag');
 
     final response = await http.post(
       Uri.parse(url),
       headers: {'Content-Type': 'application/json'},
-      body: json.encode({'name': name}),
+      body: json.encode({''
+          'name': name,
+          'userId': _currentUserId,
+      }),
     );
 
     if (response.statusCode == 200) {
@@ -198,16 +209,17 @@ class ApiService {
   }
 
   Future<Tag> updateTag(Tag tag) async {
-    const url = '$_baseUrl/tag';
+    final url = _urlWithUserId('/tag/${tag.id}');
 
     try {
       final response = await http.put(
-        Uri.parse('$url/${tag.id}'),
+        Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
         },
         body: json.encode({
           'name': tag.name,
+          'userId': _currentUserId
         }),
       );
 
@@ -225,11 +237,11 @@ class ApiService {
   }
 
   Future<bool> deleteTag(int tagId) async {
-    const url = '$_baseUrl/tag';
+    final url = _urlWithUserId('/tag/$tagId');
 
     try {
       final response = await http.delete(
-        Uri.parse('$url/$tagId'),
+        Uri.parse(url),
       );
 
       if (response.statusCode == 200 || response.statusCode == 204) {
@@ -246,7 +258,7 @@ class ApiService {
 
   ///////////////// КАТЕГОРИИ //////////////
   Future<List<Category>> getCategories() async {
-    const url = '$_baseUrl/category';
+    final url = _urlWithUserId('/category');
 
     final response = await http.get(Uri.parse(url));
 
@@ -259,12 +271,15 @@ class ApiService {
   }
 
   Future<Category> createCategory(String name) async {
-    const url = '$_baseUrl/category';
+    final url = _urlWithUserId('/category');
 
     final response = await http.post(
       Uri.parse(url),
       headers: {'Content-Type': 'application/json'},
-      body: json.encode({'name': name}),
+      body: json.encode({''
+          'name': name,
+          'userId': _currentUserId,
+      }),
     );
 
     if (response.statusCode == 200) {
@@ -275,11 +290,11 @@ class ApiService {
   }
 
   Future<Category> updateCategory(Category category) async {
-    const url = '$_baseUrl/category';
+    final url = _urlWithUserId('/category/${category.id}');
 
     try {
       final response = await http.put(
-        Uri.parse('$url/${category.id}'),
+        Uri.parse(url),
         headers: {
           'Content-Type': 'application/json',
         },
@@ -302,11 +317,127 @@ class ApiService {
   }
 
   Future<bool> deleteCategory(int categoryId) async {
-    const url = '$_baseUrl/category';
+    final url = _urlWithUserId('/category/$categoryId');
 
     try {
       final response = await http.delete(
-        Uri.parse('$url/$categoryId'),
+        Uri.parse(url),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        return true;
+      } else if (response.statusCode == 404) {
+        throw Exception('Элемент не найден');
+      } else {
+        throw Exception('Ошибка удаления: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+// reminders
+
+  Future<List<Reminder>> getReminders() async {
+    final url = _urlWithUserId('/reminder');
+
+    final response = await http.get(Uri.parse(url));
+
+    if (response.statusCode == 200) {
+      final List<dynamic> jsonList = json.decode(response.body);
+      return jsonList.map((json) => Reminder.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to load items: ${response.statusCode}');
+    }
+  }
+
+  Future<Reminder> createReminder(Reminder reminder) async {
+    final url = _urlWithUserId('/reminder');
+
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({''
+        'id': reminder.id,
+        'title': reminder.title,
+        'description': reminder.description,
+        'message': reminder.message,
+        'itemId': reminder.itemId,
+        'recurrenceRule': reminder.recurrenceRule,
+        'reminderDate': reminder.reminderDate,
+        'isActive': reminder.isActive,
+        'createdAt': reminder.createdAt,
+        'updatedAt': reminder.updatedAt,
+        'userId': _currentUserId,
+      }),
+    );
+
+    if (response.statusCode == 200) {
+      return Reminder.fromJson(json.decode(response.body));
+    } else {
+      throw Exception('Failed to create tag');
+    }
+  }
+
+  Future<Reminder> updateReminder(Reminder reminder) async {
+    final url = _urlWithUserId('/reminder/${reminder.id}');
+
+    try {
+      final response = await http.put(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'id': reminder.id,
+          'title': reminder.title,
+          'description': reminder.description,
+          'message': reminder.message,
+          'itemId': reminder.itemId,
+          'recurrenceRule': reminder.recurrenceRule,
+          'reminderDate': reminder.reminderDate,
+          'isActive': reminder.isActive,
+          'createdAt': reminder.createdAt,
+          'updatedAt': reminder.updatedAt,
+          'userId': _currentUserId,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = json.decode(response.body);
+        return Reminder.fromJson(data);
+      } else if (response.statusCode == 404) {
+        throw Exception('Элемент не найден');
+      } else {
+        throw Exception('Ошибка обновления: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Ошибка сети: $e');
+    }
+  }
+
+  Future<void> updateReminderActive(int reminderId, bool isActive) async {
+    try {
+      final url = '$baseUrl/reminder/$reminderId/active?isActive=$isActive';
+      final response = await http.put(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to update active status: ${response.statusCode}');
+      }
+    } catch (e) {
+      throw Exception('Network error: $e');
+    }
+  }
+
+  Future<bool> deleteReminder(int reminderId) async {
+    final url = _urlWithUserId('/reminder/$reminderId');
+
+    try {
+      final response = await http.delete(
+        Uri.parse(url),
       );
 
       if (response.statusCode == 200 || response.statusCode == 204) {
