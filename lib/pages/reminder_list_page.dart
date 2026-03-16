@@ -60,7 +60,16 @@ class _ReminderListPageState extends State<ReminderListPage> {
         body: _buildBody(),
         floatingActionButton: FloatingActionButton(
           onPressed: () {
-            _showAddDialog();
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => ReminderDetailPage(reminder: null),
+              ),
+            ).then((createdReminder) {
+              if (createdReminder != null) {
+                _loadReminders();
+              }
+            });
           },
           backgroundColor: Colors.brown,
           foregroundColor: Colors.white,
@@ -146,10 +155,6 @@ class _ReminderListPageState extends State<ReminderListPage> {
     );
   }
 
-  void _showAddDialog() {
-
-  }
-
   void _toggleActive(Reminder reminder, bool newValue) async {
     // Сохраняем индекс до изменения
     final index = _reminders.indexWhere((r) => r.id == reminder.id);
@@ -185,7 +190,11 @@ class _ReminderListPageState extends State<ReminderListPage> {
       MaterialPageRoute(
         builder: (context) => ReminderDetailPage(reminder: reminder),
       ),
-    );
+    ).then((updatedReminder) {
+      if (updatedReminder != null) {
+        _loadReminders();
+      }
+    });
   }
 }
 
@@ -197,13 +206,13 @@ class CardReminder extends StatelessWidget {
   final ValueChanged<bool>? onActiveChanged;
 
   const CardReminder({
-    Key? key,
+    super.key,
     required this.reminder,
     this.onTap,
     this.onEdit,
     this.onDelete,
     this.onActiveChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

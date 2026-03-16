@@ -3,8 +3,10 @@ import 'package:catalog_app_mobile/models/reminder.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import '../services/api_service.dart';
+
 class ReminderDetailPage extends StatefulWidget{
-  final Reminder reminder;
+  final Reminder? reminder;
 
   const ReminderDetailPage({super.key, required this.reminder});
 
@@ -15,6 +17,7 @@ class ReminderDetailPage extends StatefulWidget{
 class ReminderDetailPageState extends State<ReminderDetailPage> {
   late Reminder _currentReminder;
   bool _hasChanges = false;
+  bool _isCreating = false;
 
   // Контроллеры для полей ввода
   late TextEditingController _titleController;
@@ -24,9 +27,11 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
   @override
   void initState() {
     super.initState();
-    _currentReminder = widget.reminder;
+    _isCreating = widget.reminder == null;
 
-    _titleController = TextEditingController(text: _currentReminder.title);
+    _currentReminder = widget.reminder ?? Reminder.empty();
+
+    _titleController = TextEditingController(text: _currentReminder.title ?? '');
     _descriptionController = TextEditingController(text: _currentReminder.description ?? '');
     _messageController = TextEditingController(text: _currentReminder.message ?? '');
   }
@@ -48,23 +53,19 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_currentReminder.title),
+        title: Text(_currentReminder.title.isNotEmpty ? _currentReminder.title : 'Новое напоминание'),
         backgroundColor: Colors.brown,
         foregroundColor: Colors.white,
         actions: [
-          // Кнопка сохранения
-          CupertinoButton(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: const Text(
-              'Сохранить',
-              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
+          IconButton(
+            icon: const Icon(Icons.check),
             onPressed: _saveChanges,
+            tooltip: 'Сохранить',
           ),
         ],
       ),
       body: ListView(
-        padding:  EdgeInsets.symmetric(horizontal: 10.0),
+        padding:  const EdgeInsets.all(25.0),
         children: [
           const Text(
             'Название',
@@ -136,8 +137,63 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
     );
   }
 
-  void _saveChanges() {
-    Navigator.pop(context, _currentReminder);
+  Future<void> _saveChanges() async {
+    final newTitle = _titleController.text.trim();
+    if (newTitle.isEmpty) {
+      _showError('Введите название');
+      return;
+    }
+
+    final updated = Reminder(
+      id: _isCreating ? 0 : _currentReminder.id,
+      title: newTitle,
+      description: _descriptionController.text.trim(),
+      message: _messageController.text.trim(),
+      isActive: _currentReminder.isActive,
+      itemId: _currentReminder.itemId,
+      createdAt: _currentReminder.createdAt ?? DateTime.now(),
+      updatedAt: DateTime.now(),
+      recurrenceRule: _currentReminder.recurrenceRule,
+      reminderDate: _currentReminder.reminderDate,
+    );
+
+    try {
+      Reminder savedReminder;
+
+      if (_isCreating) {
+        savedReminder = await ApiService().createReminder(updated);
+      } else {
+        savedReminder = await ApiService().updateReminder(updated);
+      }
+
+      Navigator.pop(context, _currentReminder);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Изменения сохранены'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      _showError('Ошибка сохранения: $e');
+    }
+  }
+
+  void _showError(String message) {
+    showDialog(
+      context: context,
+      builder: (context) =>
+          AlertDialog(
+            title: const Text('Ошибка'),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+    );
   }
 
   Widget _buildDateTimeField() {
@@ -145,7 +201,7 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Время',
+          'Дата и время',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 8),
@@ -191,6 +247,9 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
   }
 
   Widget _buildRecurrenceField() {
+    final rule = _currentReminder.recurrenceRule;
+    if (rule == null) return const SizedBox.shrink();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -218,11 +277,11 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _currentReminder.recurrenceRule!.frequency.frequencyDisplay,
+                        rule.frequency.frequencyDisplay,
                         style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
                       ),
                       Text(
-                        _getRecurrenceDetails(_currentReminder.recurrenceRule!),
+                        _getRecurrenceDetails(rule),
                         style: TextStyle(fontSize: 14, color: Colors.grey[600]),
                       ),
                     ],
@@ -236,20 +295,20 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
         const SizedBox(height: 8),
 
         // Детали повторения
-        if (_currentReminder.recurrenceRule!.untilDate != null)
+        if (rule.untilDate != null)
           Padding(
             padding: const EdgeInsets.only(left: 8),
             child: Text(
-              'До: ${_formatDateTime(_currentReminder.recurrenceRule!.untilDate!)}',
+              'До: ${_formatDateTime(rule.untilDate!)}',
               style: TextStyle(color: Colors.grey[600], fontSize: 14),
             ),
           ),
 
-        if (_currentReminder.recurrenceRule!.occurrencesCount != null)
+        if (rule.occurrencesCount != null)
           Padding(
             padding: const EdgeInsets.only(left: 8),
             child: Text(
-              'Количество: ${_currentReminder.recurrenceRule!.occurrencesCount}',
+              'Количество: ${rule.occurrencesCount}',
               style: TextStyle(color: Colors.grey[600], fontSize: 14),
             ),
           ),
@@ -294,7 +353,38 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
     return '${date.day}.${date.month}.${date.year} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
   }
 
-  void _selectRecurrence() {
+  Future<void> _selectRecurrence() async {
+    final Frequency? selected = await showCupertinoModalPopup(
+      context: context,
+      builder: (BuildContext context) {
+        return CupertinoActionSheet(
+          title: const Text('Выберите повторение'),
+          actions: [
+            for (var frequency in Frequency.values)
+              CupertinoActionSheetAction(
+                onPressed: () => Navigator.pop(context, frequency),
+                child: Text(frequency.frequencyDisplay),
+              ),
+          ],
+          cancelButton: CupertinoActionSheetAction(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Отмена'),
+          ),
+        );
+      },
+    );
+
+    if (selected != null) {
+      setState(() {
+        // создаем новое или обновляем
+        _currentReminder.recurrenceRule = RecurrenceRule(
+          frequency: selected,
+          intervalValue: 1, // значение по умолчанию
+        );
+        _currentReminder.reminderDate = null; // убираем дату
+        _hasChanges = true;
+      });
+    }
   }
 
   void _switchToRecurrence() {
@@ -304,7 +394,24 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
     });
   }
 
-  _buildChoiceField() {}
+  Widget _buildChoiceField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+        'Тип напоминания',
+        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            _buildDateTimeField(),
+            _buildRecurrenceField()
+          ],
+        )
+      ],
+    );
+  }
 
   void _switchToDateTime() {
     setState(() {
@@ -314,6 +421,8 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
   }
 
   String _getRecurrenceDetails(RecurrenceRule rule) {
+    if (rule == null) return '';
+
     if (rule.intervalValue > 1) {
       return 'Каждые ${rule.intervalValue} ${_getIntervalWord(rule)}';
     }

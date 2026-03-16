@@ -26,7 +26,22 @@ class Reminder {
     required this.createdAt,
     required this.updatedAt});
 
+  factory Reminder.empty() {
+    return Reminder(
+        id: 0,
+        title: '',
+        isActive: true,
+        reminderDate: DateTime.now(),
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now());
+  }
+
   factory Reminder.fromJson(Map<String, dynamic> json) {
+    print('🔍 Парсинг Reminder:');
+    json.forEach((key, value) {
+      print('  $key: $value (${value.runtimeType})');
+    });
+
     return Reminder(
       id: json['id'] as int,
       title: json['title'] as String,
@@ -36,7 +51,9 @@ class Reminder {
       recurrenceRule: json['recurrenceRule'] != null
           ? RecurrenceRule.fromJson(json['recurrenceRule'])
           : null,
-      reminderDate: DateTime.parse(json['reminderDate'] as String),
+      reminderDate: json['reminderDate'] != null
+          ? DateTime.parse(json['reminderDate'] as String)
+          : null,
       isActive: json['isActive'] as bool,
       createdAt: DateTime.parse(json['createdAt'] as String),
       updatedAt: DateTime.parse(json['updatedAt'] as String),

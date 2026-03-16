@@ -347,7 +347,7 @@ class ApiService {
       final List<dynamic> jsonList = json.decode(response.body);
       return jsonList.map((json) => Reminder.fromJson(json)).toList();
     } else {
-      throw Exception('Failed to load items: ${response.statusCode}');
+      throw Exception('Failed to load reminders: ${response.statusCode}');
     }
   }
 
@@ -364,10 +364,10 @@ class ApiService {
         'message': reminder.message,
         'itemId': reminder.itemId,
         'recurrenceRule': reminder.recurrenceRule,
-        'reminderDate': reminder.reminderDate,
+        'reminderDate': reminder.reminderDate?.toIso8601String(),
         'isActive': reminder.isActive,
-        'createdAt': reminder.createdAt,
-        'updatedAt': reminder.updatedAt,
+        'createdAt': reminder.createdAt.toIso8601String(),
+        'updatedAt': reminder.updatedAt.toIso8601String(),
         'userId': _currentUserId,
       }),
     );
@@ -375,7 +375,7 @@ class ApiService {
     if (response.statusCode == 200) {
       return Reminder.fromJson(json.decode(response.body));
     } else {
-      throw Exception('Failed to create tag');
+      throw Exception('Failed to create reminder');
     }
   }
 
@@ -395,10 +395,10 @@ class ApiService {
           'message': reminder.message,
           'itemId': reminder.itemId,
           'recurrenceRule': reminder.recurrenceRule,
-          'reminderDate': reminder.reminderDate,
+          'reminderDate': reminder.reminderDate?.toIso8601String(),
           'isActive': reminder.isActive,
-          'createdAt': reminder.createdAt,
-          'updatedAt': reminder.updatedAt,
+          'createdAt': reminder.createdAt.toIso8601String(),
+          'updatedAt': reminder.updatedAt.toIso8601String(),
           'userId': _currentUserId,
         }),
       );
