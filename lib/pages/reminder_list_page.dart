@@ -120,6 +120,7 @@ class _ReminderListPageState extends State<ReminderListPage> {
           reminder: reminder,
           onTap: () => _navigateToDetail(reminder),
           onDelete: () => _showDeleteDialog(reminder),
+          showBottomSheet: () => _showBottomSheet(reminder),
           onActiveChanged: (newValue) =>
               _toggleActive(reminder, newValue),
         );
@@ -196,6 +197,39 @@ class _ReminderListPageState extends State<ReminderListPage> {
       }
     });
   }
+
+  void _showBottomSheet(Reminder reminder) {
+    showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return SizedBox(
+          height: 160,
+          child: Column(
+            children: [
+              ListTile(
+                  minTileHeight: 50,
+                  leading: const Icon(Icons.edit),
+                  title: const Text('Редактировать'),
+                  onTap: () {
+                    Navigator.pop(context); // закрыть окно
+                    _navigateToDetail(reminder);
+                  },
+              ),
+              ListTile(
+                minTileHeight: 50,
+                leading: const Icon(Icons.delete),
+                title: const Text('Удалить', style: TextStyle(color: Colors.red)),
+                onTap: () {
+                  Navigator.pop(context); // закрыть окно
+                  _showDeleteDialog(reminder);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
 }
 
 class CardReminder extends StatelessWidget {
@@ -203,6 +237,7 @@ class CardReminder extends StatelessWidget {
   final VoidCallback? onTap;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? showBottomSheet;
   final ValueChanged<bool>? onActiveChanged;
 
   const CardReminder({
@@ -212,6 +247,7 @@ class CardReminder extends StatelessWidget {
     this.onEdit,
     this.onDelete,
     this.onActiveChanged,
+    this.showBottomSheet,
   });
 
   @override
@@ -223,18 +259,22 @@ class CardReminder extends StatelessWidget {
       ),
       child:   InkWell(
         onTap: onTap,
-        onLongPress: onEdit,
+        onLongPress: showBottomSheet,
         child: ListTile(
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 reminder.title,
-                style: const TextStyle(fontWeight: FontWeight.bold),
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
               ),
               Text(
-                reminder.recurrenceRule?.frequency.frequencyDisplay ?? 'Без повторения',
-                style: const TextStyle(color: Colors.blueGrey),
+                  reminder.recurrenceRule != null
+                      ? reminder.recurrenceRule!.frequency.frequencyDisplay
+                      : (reminder.reminderDate != null
+                      ? _formatDateTime(reminder.reminderDate!)
+                      : 'Без повторения'),
+                style: const TextStyle(color: Colors.blueGrey, fontSize: 14),
               )
             ],
           ),
@@ -251,5 +291,14 @@ class CardReminder extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatDateTime(DateTime date) {
+    const List<String> months = [
+      'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+      'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+    ];
+
+    return '${date.day} ${months[date.month - 1]} ${date.year} год';
   }
 }
