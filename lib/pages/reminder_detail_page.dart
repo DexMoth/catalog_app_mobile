@@ -375,15 +375,8 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
     );
 
     if (selected != null) {
-      setState(() {
-        // создаем новое или обновляем
-        _currentReminder.recurrenceRule = RecurrenceRule(
-          frequency: selected,
-          intervalValue: 1, // значение по умолчанию
-        );
-        _currentReminder.reminderDate = null; // убираем дату
-        _hasChanges = true;
-      });
+      // После выбора частоты показываем дополнительные настройки
+      _configureRecurrenceDetails(selected);
     }
   }
 
@@ -423,10 +416,31 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
   String _getRecurrenceDetails(RecurrenceRule rule) {
     if (rule == null) return '';
 
+    final buffer = StringBuffer();
+
     if (rule.intervalValue > 1) {
-      return 'Каждые ${rule.intervalValue} ${_getIntervalWord(rule)}';
+      buffer.write('Каждые ${rule.intervalValue} ${_getIntervalWord(rule)}');
     }
-    return '';
+
+    if (rule.frequency == Frequency.weekly) {
+      final days = rule.weekDaysDisplay;
+      if (days != 'Каждый день' && days != 'Нет дней') {
+        if (buffer.isNotEmpty) buffer.write('\n');
+        buffer.write(days);
+      }
+    }
+
+    if (rule.frequency == Frequency.monthly && rule.monthDayDisplay.isNotEmpty) {
+      if (buffer.isNotEmpty) buffer.write('\n');
+      buffer.write(rule.monthDayDisplay);
+    }
+
+    if (rule.frequency == Frequency.yearly && rule.yearDayDisplay.isNotEmpty) {
+      if (buffer.isNotEmpty) buffer.write('\n');
+      buffer.write(rule.yearDayDisplay);
+    }
+
+    return buffer.toString();
   }
 
   String _getIntervalWord(RecurrenceRule rule) {
@@ -437,8 +451,291 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
         return 'недели';
       case Frequency.monthly:
         return 'месяца';
+      case Frequency.seasonally:
+        return 'сезона';
       case Frequency.yearly:
         return 'года';
+
     }
+  }
+
+  Future<void> _configureRecurrenceDetails(Frequency frequency) async {
+    switch (frequency) {
+      case Frequency.weekly:
+        final rule = await _showWeekDaysSelector();
+        if (rule != null && mounted) {
+          setState(() {
+            _currentReminder.recurrenceRule = rule;
+            _currentReminder.reminderDate = null;
+            _hasChanges = true;
+          });
+        }
+        break;
+
+      case Frequency.monthly:
+        final rule = await _showMonthDaySelector();
+        if (rule != null && mounted) {
+          setState(() {
+            _currentReminder.recurrenceRule = rule;
+            _currentReminder.reminderDate = null;
+            _hasChanges = true;
+          });
+        }
+        break;
+
+      case Frequency.yearly:
+        final rule = await _showYearDaySelector();
+        if (rule != null && mounted) {
+          setState(() {
+            _currentReminder.recurrenceRule = rule;
+            _currentReminder.reminderDate = null;
+            _hasChanges = true;
+          });
+        }
+        break;
+
+      default:
+        if (mounted) {
+          setState(() {
+            _currentReminder.recurrenceRule = RecurrenceRule(
+              frequency: frequency,
+              intervalValue: 1,
+            );
+            _currentReminder.reminderDate = null;
+            _hasChanges = true;
+          });
+        }
+    }
+  }
+
+  Future<RecurrenceRule?> _showWeekDaysSelector() async {
+    final existingRule = _currentReminder.recurrenceRule;
+
+    final tempRule = _currentReminder.recurrenceRule?.copyWith() ??
+        RecurrenceRule(
+          id: existingRule?.id,
+          frequency: Frequency.weekly,  // явно указываем weekly
+          intervalValue: 1,
+        );
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Container(
+              padding: const EdgeInsets.all(16),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Выберите дни недели',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildWeekDayTile('Пн', tempRule.monday, (value) {
+                      setState(() => tempRule.monday = value);
+                    }),
+                    _buildWeekDayTile('Вт', tempRule.tuesday, (value) {
+                      setState(() => tempRule.tuesday = value);
+                    }),
+                    _buildWeekDayTile('Ср', tempRule.wednesday, (value) {
+                      setState(() => tempRule.wednesday = value);
+                    }),
+                    _buildWeekDayTile('Чт', tempRule.thursday, (value) {
+                      setState(() => tempRule.thursday = value);
+                    }),
+                    _buildWeekDayTile('Пт', tempRule.friday, (value) {
+                      setState(() => tempRule.friday = value);
+                    }),
+                    _buildWeekDayTile('Сб', tempRule.saturday, (value) {
+                      setState(() => tempRule.saturday = value);
+                    }),
+                    _buildWeekDayTile('Вс', tempRule.sunday, (value) {
+                      setState(() => tempRule.sunday = value);
+                    }),
+                    const SizedBox(height: 10),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Отмена'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            this.setState(() {
+                              tempRule.frequency = Frequency.weekly;
+                              _currentReminder.recurrenceRule = tempRule;
+                              _currentReminder.reminderDate = null;
+                              _hasChanges = true;
+                            });
+                          },
+                          child: const Text('Сохранить'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildWeekDayTile(String day, bool value, Function(bool) onChanged) {
+    return CheckboxListTile(
+      title: Text(day),
+      value: value,
+      onChanged: (newValue) => onChanged(newValue ?? false),
+      controlAffinity: ListTileControlAffinity.leading,
+    );
+  }
+
+  Future<RecurrenceRule?> _showMonthDaySelector() {
+    final existingRule = _currentReminder.recurrenceRule;
+    int selectedDay = _currentReminder.recurrenceRule?.monthDay ?? 1;
+
+    return showModalBottomSheet<RecurrenceRule>(
+      context: context,
+      builder: (BuildContext context) {
+        return Container(
+          height: 300,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              const Text(
+                'Выберите день месяца',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              Expanded(
+                child: CupertinoPicker(
+                  itemExtent: 40,
+                  onSelectedItemChanged: (index) {
+                    selectedDay = index + 1;
+                  },
+                  children: List.generate(31, (index) {
+                    return Center(child: Text('${index + 1}'));
+                  }),
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Отмена'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      final rule = RecurrenceRule(
+                        id: existingRule?.id,
+                        frequency: Frequency.monthly,
+                        monthDay: selectedDay,
+                        intervalValue: existingRule?.intervalValue ?? 1,
+                        untilType: existingRule?.untilType ?? UntilType.never,
+                        untilDate: existingRule?.untilDate,
+                        occurrencesCount: existingRule?.occurrencesCount,
+                        description: existingRule?.description,
+                        createdAt: existingRule?.createdAt,
+                        updatedAt: existingRule?.updatedAt,
+                      );
+                      Navigator.pop(context, rule);
+                    },
+                    child: const Text('Сохранить'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<RecurrenceRule?> _showYearDaySelector() {
+    final existingRule = _currentReminder.recurrenceRule;
+    int selectedMonth = _currentReminder.recurrenceRule?.yearMonth ?? 1;
+    int selectedDay = _currentReminder.recurrenceRule?.yearDay ?? 1;
+
+    return showModalBottomSheet(
+      context: context,
+      builder: (BuildContext context) {
+        return Container(
+          height: 400,
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            children: [
+              const Text(
+                'Выберите дату',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              Expanded(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: CupertinoPicker(
+                        itemExtent: 40,
+                        onSelectedItemChanged: (index) {
+                          selectedMonth = index + 1;
+                        },
+                        children: const [
+                          'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                          'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+                        ].map((month) => Center(child: Text(month))).toList(),
+                      ),
+                    ),
+                    Expanded(
+                      child: CupertinoPicker(
+                        itemExtent: 40,
+                        onSelectedItemChanged: (index) {
+                          selectedDay = index + 1;
+                        },
+                        children: List.generate(31, (index) {
+                          return Center(child: Text('${index + 1}'));
+                        }),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Отмена'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      final rule = RecurrenceRule(
+                        id: existingRule?.id,  // ← сохраняем ID
+                        frequency: Frequency.yearly,
+                        yearMonth: selectedMonth,
+                        yearDay: selectedDay,
+                        intervalValue: existingRule?.intervalValue ?? 1,
+                        untilType: existingRule?.untilType ?? UntilType.never,
+                        untilDate: existingRule?.untilDate,
+                        occurrencesCount: existingRule?.occurrencesCount,
+                        description: existingRule?.description,
+                        createdAt: existingRule?.createdAt,
+                        updatedAt: existingRule?.updatedAt,
+                      );
+                      Navigator.pop(context, rule);
+                    },
+                    child: const Text('Сохранить'),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

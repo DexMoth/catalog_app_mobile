@@ -270,7 +270,7 @@ class CardReminder extends StatelessWidget {
               ),
               Text(
                   reminder.recurrenceRule != null
-                      ? reminder.recurrenceRule!.frequency.frequencyDisplay
+                      ? reminder.recurrenceRule!.getDisplayString()
                       : (reminder.reminderDate != null
                       ? _formatDateTime(reminder.reminderDate!)
                       : 'Без повторения'),
