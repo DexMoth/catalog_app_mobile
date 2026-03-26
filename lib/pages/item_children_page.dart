@@ -205,8 +205,8 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
               child: Row(
                 children: [
                   // Изображение
-                  SizedBox(
-                    width: 140,
+                  Expanded(
+                    flex: 1,
                     child: _buildImage(item),
                   ),
                   // Текст и иконки
@@ -300,7 +300,7 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
     } else {
       return Container(
         color: Colors.grey[200],
-        child: Icon(Icons.photo, color: Colors.grey[400]),
+        child: Icon(Icons.photo, size: 40, color: Colors.grey[400]),
       );
     }
   }

@@ -278,34 +278,40 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
             runSpacing: 1,
             children: [
               if (itemCategories != null)
-                Chip(
-                  label: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildCategoryWidget(),
-                        const SizedBox(width: 4),
-                        GestureDetector(
-                          onTap: () {
-                            // Удаляем категорию при нажатии на крестик
-                            setState(() {
-                              _currentItem.category = null;
-                            });
-                          },
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.brown.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Текст категории
+                      Padding(
+                        padding: const EdgeInsets.only(left: 12, right: 4, top: 6, bottom: 6),
+                        child: _buildCategoryWidget(),
+                      ),
+                      // Крестик для удаления
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _currentItem.category = null;
+                            _category = null;
+                            _hasChanges = true;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          margin: const EdgeInsets.only(right: 4),
                           child: const Icon(
                             Icons.close,
-                            size: 14,
+                            size: 16,
                             color: Colors.brown,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  backgroundColor: Colors.brown.withOpacity(0.1),
-                  labelStyle: const TextStyle(color: Colors.brown),
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
                 ),
               // Сообщение если нет категорий
               if (itemCategories == null)
@@ -317,7 +323,7 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
                     fontSize: 12,
                   ),
                 ),
-              // Кнопка добавления категории - ВСЕГДА показывается
+              // Кнопка добавления категории
               IconButton(
                 onPressed: () {
                   _showDialogAddCategory(context);
@@ -335,6 +341,7 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
                   ),
                 ),
                 padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
               ),
             ],
           ),

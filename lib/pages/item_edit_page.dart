@@ -443,37 +443,41 @@ class _EditItemPageState extends State<EditItemPage> {
       final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
 
       if (pickedFile != null) {
-        // очищаем кэш, чтобы обновилось
+        // Очищаем кэш, чтобы обновилось
         if (_currentItem.imagePath != null && !kIsWeb) {
           final oldImageProvider = FileImage(File(_currentItem.imagePath!));
           imageCache.evict(oldImageProvider);
         }
 
+        // Читаем байты изображения
+        final bytes = await pickedFile.readAsBytes();
+
+        // Сохраняем как base64 для всех платформ
+        final base64String = base64Encode(bytes);
+
+        // Определяем mime-type
+        final extension = path.extension(pickedFile.name).toLowerCase();
+        String mimeType = 'image/jpeg';
+        if (extension == '.png') mimeType = 'image/png';
+        else if (extension == '.gif') mimeType = 'image/gif';
+        else if (extension == '.webp') mimeType = 'image/webp';
+
+        // Формируем data URL
+        final imageData = 'data:$mimeType;base64,$base64String';
+
+        // Обновляем состояние
+        setState(() {
+          _selectedImageBase64 = imageData;
+          _selectedImagePath = null;
+          _currentItem.imagePath = imageData; // ← сохраняем в поле
+        });
+
+        // Предложение категории (для мобилок - через файл, для веба - через base64)
         if (kIsWeb) {
-          // Для веба - читаем байты и конвертируем через ImageService
-          final bytes = await pickedFile.readAsBytes();
-          final base64String = base64Encode(bytes);
-
-          // Определяем mime-type по расширению
-          final extension = path.extension(pickedFile.name).toLowerCase();
-          String mimeType = 'image/jpeg';
-          if (extension == '.png') mimeType = 'image/png';
-          else if (extension == '.gif') mimeType = 'image/gif';
-
-          setState(() {
-            _selectedImageBase64 = 'data:$mimeType;base64,$base64String';
-            _selectedImagePath = null;
-          });
+          // Для веба - создаем временный файл из base64 для ML Kit
+          await _findCategoryForImage(imageData as File);
         } else {
-          // Для мобилок - сохраняем путь
-          setState(() {
-            _selectedImagePath = pickedFile.path;
-            _selectedImageBase64 = null;
-          });
-        }
-
-        // Предложение категории
-        if (!kIsWeb) {
+          // Для мобилок - используем файл
           await _findCategoryForImage(File(pickedFile.path));
         }
       }
@@ -680,7 +684,15 @@ class _EditItemPageState extends State<EditItemPage> {
           duration: Duration(seconds: 2),
         ),
       );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Подходящих категорий не найдено'),
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
+
   }
 
   Widget _buildCategorySuggestionWidget() {
