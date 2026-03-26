@@ -1,5 +1,6 @@
 import 'package:catalog_app_mobile/models/recurrence_rule.dart';
 import 'package:catalog_app_mobile/models/reminder.dart';
+import 'package:catalog_app_mobile/services/notification_service.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
@@ -18,6 +19,7 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
   late Reminder _currentReminder;
   bool _hasChanges = false;
   bool _isCreating = false;
+  String? _dateError;
 
   // Контроллеры для полей ввода
   late TextEditingController _titleController;
@@ -144,6 +146,14 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
       return;
     }
 
+    // проверка даты
+    if (_currentReminder.reminderDate != null && _currentReminder.recurrenceRule == null) {
+      if (_isDateInPast(_currentReminder.reminderDate!)) {
+        _showSnackBar('Нельзя сохранить напоминание с прошедшей датой и временем');
+        return;
+      }
+    }
+
     final updated = Reminder(
       id: _isCreating ? 0 : _currentReminder.id,
       title: newTitle,
@@ -166,14 +176,17 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
         savedReminder = await ApiService().updateReminder(updated);
       }
 
-      Navigator.pop(context, _currentReminder);
+      await NotificationService().scheduleReminder(savedReminder);
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Изменения сохранены'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      if (mounted) {
+        Navigator.pop(context, savedReminder);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Изменения сохранены'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } catch (e) {
       _showError('Ошибка сохранения: $e');
     }
@@ -329,24 +342,65 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
 
   Future<void> _selectDateTime() async {
     final DateTime now = DateTime.now();
-    final DateTime? date = await showCupertinoModalPopup(
+
+    final DateTime? pickedDate = await showDatePicker(
       context: context,
-      builder: (BuildContext context) {
-        return Container(
-          height: 300,
-          color: CupertinoColors.white,
-          child: CupertinoDatePicker(
-            mode: CupertinoDatePickerMode.dateAndTime,
-            initialDateTime: _currentReminder.reminderDate,
-            onDateTimeChanged: (DateTime newDate) {
-              setState(() {
-                _currentReminder.reminderDate = newDate;
-              });
-            },
+      initialDate: _currentReminder.reminderDate ?? now,
+      firstDate: now,
+      lastDate: DateTime(now.year + 10),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Colors.brown,
+              onPrimary: Colors.white,
+            ),
           ),
+          child: child!,
         );
       },
     );
+
+    if (pickedDate != null) {
+      // выбираем время 24ч
+      final TimeOfDay? pickedTime = await showTimePicker(
+        context: context,
+        initialTime: TimeOfDay.fromDateTime(_currentReminder.reminderDate ?? now),
+        builder: (context, child) {
+          return Theme(
+            data: Theme.of(context).copyWith(
+              colorScheme: ColorScheme.light(
+                primary: Colors.brown,
+                onPrimary: Colors.white,
+              ),
+            ),
+            child: child!,
+          );
+        },
+      );
+
+      if (pickedTime != null) {
+        final DateTime finalDate = DateTime(
+          pickedDate.year,
+          pickedDate.month,
+          pickedDate.day,
+          pickedTime.hour,
+          pickedTime.minute,
+        );
+
+        // проверяем, не прошедшая ли дата
+        if (_isDateInPast(finalDate)) {
+          _showSnackBar('Выбранная дата и время уже прошли. Выберите будущую дату.');
+          return;
+        }
+
+        setState(() {
+          _currentReminder.reminderDate = finalDate;
+          _currentReminder.recurrenceRule = null; //убираем правило
+          _hasChanges = true;
+        });
+      }
+    }
   }
 
   String _formatDateTime(DateTime date) {
@@ -511,14 +565,20 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
   Future<RecurrenceRule?> _showWeekDaysSelector() async {
     final existingRule = _currentReminder.recurrenceRule;
 
-    final tempRule = _currentReminder.recurrenceRule?.copyWith() ??
-        RecurrenceRule(
-          id: existingRule?.id,
-          frequency: Frequency.weekly,  // явно указываем weekly
-          intervalValue: 1,
-        );
+    final tempRule = RecurrenceRule(
+      id: existingRule?.id,
+      frequency: Frequency.weekly,
+      intervalValue: existingRule?.intervalValue ?? 1,
+      monday: existingRule?.monday ?? false,
+      tuesday: existingRule?.tuesday ?? false,
+      wednesday: existingRule?.wednesday ?? false,
+      thursday: existingRule?.thursday ?? false,
+      friday: existingRule?.friday ?? false,
+      saturday: existingRule?.saturday ?? false,
+      sunday: existingRule?.sunday ?? false,
+    );
 
-    showModalBottomSheet(
+    return showModalBottomSheet<RecurrenceRule>(
       context: context,
       isScrollControlled: true,
       builder: (BuildContext context) {
@@ -526,60 +586,53 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
           builder: (context, setState) {
             return Container(
               padding: const EdgeInsets.all(16),
-              child: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      'Выберите дни недели',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildWeekDayTile('Пн', tempRule.monday, (value) {
-                      setState(() => tempRule.monday = value);
-                    }),
-                    _buildWeekDayTile('Вт', tempRule.tuesday, (value) {
-                      setState(() => tempRule.tuesday = value);
-                    }),
-                    _buildWeekDayTile('Ср', tempRule.wednesday, (value) {
-                      setState(() => tempRule.wednesday = value);
-                    }),
-                    _buildWeekDayTile('Чт', tempRule.thursday, (value) {
-                      setState(() => tempRule.thursday = value);
-                    }),
-                    _buildWeekDayTile('Пт', tempRule.friday, (value) {
-                      setState(() => tempRule.friday = value);
-                    }),
-                    _buildWeekDayTile('Сб', tempRule.saturday, (value) {
-                      setState(() => tempRule.saturday = value);
-                    }),
-                    _buildWeekDayTile('Вс', tempRule.sunday, (value) {
-                      setState(() => tempRule.sunday = value);
-                    }),
-                    const SizedBox(height: 10),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Отмена'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () {
-                            Navigator.pop(context);
-                            this.setState(() {
-                              tempRule.frequency = Frequency.weekly;
-                              _currentReminder.recurrenceRule = tempRule;
-                              _currentReminder.reminderDate = null;
-                              _hasChanges = true;
-                            });
-                          },
-                          child: const Text('Сохранить'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Выберите дни недели',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildWeekDayTile('Пн', tempRule.monday, (value) {
+                    setState(() => tempRule.monday = value);
+                  }),
+                  _buildWeekDayTile('Вт', tempRule.tuesday, (value) {
+                    setState(() => tempRule.tuesday = value);
+                  }),
+                  _buildWeekDayTile('Ср', tempRule.wednesday, (value) {
+                    setState(() => tempRule.wednesday = value);
+                  }),
+                  _buildWeekDayTile('Чт', tempRule.thursday, (value) {
+                    setState(() => tempRule.thursday = value);
+                  }),
+                  _buildWeekDayTile('Пт', tempRule.friday, (value) {
+                    setState(() => tempRule.friday = value);
+                  }),
+                  _buildWeekDayTile('Сб', tempRule.saturday, (value) {
+                    setState(() => tempRule.saturday = value);
+                  }),
+                  _buildWeekDayTile('Вс', tempRule.sunday, (value) {
+                    setState(() => tempRule.sunday = value);
+                  }),
+                  const SizedBox(height: 10),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Отмена'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          tempRule.frequency = Frequency.weekly;
+                          Navigator.pop(context, tempRule);
+                        },
+                        child: const Text('Сохранить'),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             );
           },
@@ -597,145 +650,178 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
     );
   }
 
-  Future<RecurrenceRule?> _showMonthDaySelector() {
+  Future<RecurrenceRule?> _showMonthDaySelector() async {
     final existingRule = _currentReminder.recurrenceRule;
-    int selectedDay = _currentReminder.recurrenceRule?.monthDay ?? 1;
+    int selectedDay = existingRule?.monthDay ?? 1;
 
     return showModalBottomSheet<RecurrenceRule>(
       context: context,
       builder: (BuildContext context) {
-        return Container(
-          height: 300,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              const Text(
-                'Выберите день месяца',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              Expanded(
-                child: CupertinoPicker(
-                  itemExtent: 40,
-                  onSelectedItemChanged: (index) {
-                    selectedDay = index + 1;
-                  },
-                  children: List.generate(31, (index) {
-                    return Center(child: Text('${index + 1}'));
-                  }),
-                ),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Container(
+              height: 300,
+              padding: const EdgeInsets.all(16),
+              child: Column(
                 children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Отмена'),
+                  const Text(
+                    'Выберите день месяца',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                  ElevatedButton(
-                    onPressed: () {
-                      final rule = RecurrenceRule(
-                        id: existingRule?.id,
-                        frequency: Frequency.monthly,
-                        monthDay: selectedDay,
-                        intervalValue: existingRule?.intervalValue ?? 1,
-                        untilType: existingRule?.untilType ?? UntilType.never,
-                        untilDate: existingRule?.untilDate,
-                        occurrencesCount: existingRule?.occurrencesCount,
-                        description: existingRule?.description,
-                        createdAt: existingRule?.createdAt,
-                        updatedAt: existingRule?.updatedAt,
-                      );
-                      Navigator.pop(context, rule);
-                    },
-                    child: const Text('Сохранить'),
+                  Expanded(
+                    child: CupertinoPicker(
+                      itemExtent: 40,
+                      onSelectedItemChanged: (index) {
+                        setState(() {
+                          selectedDay = index + 1;
+                        });
+                      },
+                      children: List.generate(31, (index) {
+                        return Center(child: Text('${index + 1}'));
+                      }),
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Отмена'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          final rule = RecurrenceRule(
+                            id: existingRule?.id,
+                            frequency: Frequency.monthly,
+                            monthDay: selectedDay,
+                            intervalValue: existingRule?.intervalValue ?? 1,
+                            untilType: existingRule?.untilType ?? UntilType.never,
+                            untilDate: existingRule?.untilDate,
+                            occurrencesCount: existingRule?.occurrencesCount,
+                            description: existingRule?.description,
+                            createdAt: existingRule?.createdAt,
+                            updatedAt: existingRule?.updatedAt,
+                          );
+                          Navigator.pop(context, rule);
+                        },
+                        child: const Text('Сохранить'),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );
   }
 
-  Future<RecurrenceRule?> _showYearDaySelector() {
+  Future<RecurrenceRule?> _showYearDaySelector() async {
     final existingRule = _currentReminder.recurrenceRule;
-    int selectedMonth = _currentReminder.recurrenceRule?.yearMonth ?? 1;
-    int selectedDay = _currentReminder.recurrenceRule?.yearDay ?? 1;
+    int selectedMonth = existingRule?.yearMonth ?? 1;
+    int selectedDay = existingRule?.yearDay ?? 1;
 
-    return showModalBottomSheet(
+    return showModalBottomSheet<RecurrenceRule>(
       context: context,
       builder: (BuildContext context) {
-        return Container(
-          height: 400,
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              const Text(
-                'Выберите дату',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              Expanded(
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: CupertinoPicker(
-                        itemExtent: 40,
-                        onSelectedItemChanged: (index) {
-                          selectedMonth = index + 1;
-                        },
-                        children: const [
-                          'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
-                          'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
-                        ].map((month) => Center(child: Text(month))).toList(),
-                      ),
-                    ),
-                    Expanded(
-                      child: CupertinoPicker(
-                        itemExtent: 40,
-                        onSelectedItemChanged: (index) {
-                          selectedDay = index + 1;
-                        },
-                        children: List.generate(31, (index) {
-                          return Center(child: Text('${index + 1}'));
-                        }),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Container(
+              height: 400,
+              padding: const EdgeInsets.all(16),
+              child: Column(
                 children: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Отмена'),
+                  const Text(
+                    'Выберите дату',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                  ElevatedButton(
-                    onPressed: () {
-                      final rule = RecurrenceRule(
-                        id: existingRule?.id,  // ← сохраняем ID
-                        frequency: Frequency.yearly,
-                        yearMonth: selectedMonth,
-                        yearDay: selectedDay,
-                        intervalValue: existingRule?.intervalValue ?? 1,
-                        untilType: existingRule?.untilType ?? UntilType.never,
-                        untilDate: existingRule?.untilDate,
-                        occurrencesCount: existingRule?.occurrencesCount,
-                        description: existingRule?.description,
-                        createdAt: existingRule?.createdAt,
-                        updatedAt: existingRule?.updatedAt,
-                      );
-                      Navigator.pop(context, rule);
-                    },
-                    child: const Text('Сохранить'),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: CupertinoPicker(
+                            itemExtent: 40,
+                            onSelectedItemChanged: (index) {
+                              setState(() {
+                                selectedMonth = index + 1;
+                              });
+                            },
+                            children: const [
+                              'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь',
+                              'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'
+                            ].map((month) => Center(child: Text(month))).toList(),
+                          ),
+                        ),
+                        Expanded(
+                          child: CupertinoPicker(
+                            itemExtent: 40,
+                            onSelectedItemChanged: (index) {
+                              setState(() {
+                                selectedDay = index + 1;
+                              });
+                            },
+                            children: List.generate(31, (index) {
+                              return Center(child: Text('${index + 1}'));
+                            }),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Отмена'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          final rule = RecurrenceRule(
+                            id: existingRule?.id,
+                            frequency: Frequency.yearly,
+                            yearMonth: selectedMonth,
+                            yearDay: selectedDay,
+                            intervalValue: existingRule?.intervalValue ?? 1,
+                            untilType: existingRule?.untilType ?? UntilType.never,
+                            untilDate: existingRule?.untilDate,
+                            occurrencesCount: existingRule?.occurrencesCount,
+                            description: existingRule?.description,
+                            createdAt: existingRule?.createdAt,
+                            updatedAt: existingRule?.updatedAt,
+                          );
+                          Navigator.pop(context, rule);
+                        },
+                        child: const Text('Сохранить'),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
+    );
+  }
+
+  String _formatTime(DateTime date) {
+    return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
+  /// проверка даты
+  bool _isDateInPast(DateTime date) {
+    return date.isBefore(DateTime.now());
+  }
+
+  void _showSnackBar(String message, {Color backgroundColor = Colors.red}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: backgroundColor,
+        duration: const Duration(seconds: 3),
+      ),
     );
   }
 }

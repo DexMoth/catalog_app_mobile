@@ -1,7 +1,9 @@
+import 'package:app_settings/app_settings.dart';
 import 'package:catalog_app_mobile/models/recurrence_rule.dart';
 import 'package:catalog_app_mobile/models/reminder.dart';
 import 'package:catalog_app_mobile/pages/reminder_detail_page.dart';
 import 'package:catalog_app_mobile/services/api_service.dart';
+import 'package:catalog_app_mobile/services/notification_service.dart';
 import 'package:catalog_app_mobile/widgets/appDrawer.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -25,6 +27,7 @@ class _ReminderListPageState extends State<ReminderListPage> {
   void initState() {
     super.initState();
     _loadReminders();
+    _checkNotificationPermission();
   }
 
   Future<void> _loadReminders() async {
@@ -40,6 +43,7 @@ class _ReminderListPageState extends State<ReminderListPage> {
         _reminders = reminders;
         _isLoading = false;
       });
+      await NotificationService().rescheduleAll(reminders);
     } catch (e) {
       setState(() {
         _error = e.toString();
@@ -161,6 +165,18 @@ class _ReminderListPageState extends State<ReminderListPage> {
     final index = _reminders.indexWhere((r) => r.id == reminder.id);
     if (index == -1) return;
 
+    // для разовых напоминаний
+    // если дата уже прошла
+    if (newValue && reminder.recurrenceRule == null && reminder.reminderDate != null) {
+      if (reminder.reminderDate!.isBefore(DateTime.now())) {
+        _showSnackBar(
+          'Нельзя активировать напоминание с прошедшей датой. Измените дату или установите повторение.',
+          backgroundColor: Colors.orange,
+        );
+        return;
+      }
+    }
+    
     final oldValue = _reminders[index].isActive;
 
     setState(() {
@@ -170,6 +186,15 @@ class _ReminderListPageState extends State<ReminderListPage> {
     // Отправка на сервер
     try {
       await ApiService().updateReminderActive(reminder.id, newValue);
+
+      // обновить уведомление
+      if (newValue) {
+        await NotificationService().scheduleReminder(_reminders[index]);
+        await NotificationService().checkPendingNotifications();
+      } else {
+        await NotificationService().cancelReminder(reminder.id);
+      }
+
     } catch (e) {
       // Откат при ошибке
       setState(() {
@@ -228,6 +253,51 @@ class _ReminderListPageState extends State<ReminderListPage> {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _checkNotificationPermission() async {
+    final enabled = await NotificationService().areNotificationsEnabled();
+    if (!enabled) {
+      // Показать диалог с просьбой включить уведомления
+      _showNotificationPermissionDialog();
+    }
+  }
+
+  void _showNotificationPermissionDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Включите уведомления'),
+        content: const Text(
+            'Для получения напоминаний необходимо разрешить уведомления.\n\n'
+                'Перейдите в настройки приложения и включите разрешение "Уведомления".'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Позже'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              // Открыть настройки приложения
+              AppSettings.openAppSettings();
+            },
+            child: const Text('Открыть настройки'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSnackBar(String message, {Color backgroundColor = Colors.red}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: backgroundColor,
+        duration: const Duration(seconds: 3),
+      ),
     );
   }
 }

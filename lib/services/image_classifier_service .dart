@@ -19,47 +19,47 @@ class ImageClassifierService {
       final categories = await ApiService().getCategories();
 
       final synonyms = {
-        'одежда': ['clothing', 'shirt', 't-shirt', 'jacket', 'jeans', 'dress',
+        'Одежда': ['clothing', 'shirt', 't-shirt', 'jacket', 'jeans', 'dress',
           'skirt', 'pants', 'sweater', 'coat', 'suit',
           'shoe', 'boot', 'sneaker', 'sandal', 'hat', 'cap',
           'glove', 'scarf', 'uniform', 'swimwear'],
 
-        'мебель': ['furniture', 'table', 'chair', 'sofa', 'couch', 'bed',
+        'Мебель': ['furniture', 'table', 'chair', 'sofa', 'couch', 'bed',
           'wardrobe', 'cabinet', 'shelf', 'bookcase', 'desk',
           'stool', 'bench', 'dresser', 'cupboard', 'rack'],
 
-        'электроника': ['electronics', 'laptop', 'computer', 'phone', 'smartphone',
+        'Электроника': ['electronics', 'laptop', 'computer', 'phone', 'smartphone',
           'tablet', 'keyboard', 'mouse', 'monitor', 'tv',
           'television', 'camera', 'headphones', 'speaker',
           'charger', 'battery', 'remote'],
 
-        'посуда': ['dishes', 'plate', 'cup', 'glass', 'bowl', 'mug',
+        'Посуда': ['dishes', 'plate', 'cup', 'glass', 'bowl', 'mug',
           'utensils', 'fork', 'knife', 'spoon', 'pan', 'pot',
           'kettle', 'teapot'],
 
-        'книги': ['book', 'books', 'textbook', 'novel', 'magazine',
+        'Книги': ['book', 'books', 'textbook', 'novel', 'magazine',
           'notebook', 'diary', 'journal', 'comic'],
 
-        'хобби': ['hobby', 'hobbies', 'game', 'toy', 'puzzle', 'chess',
+        'Хобби': ['hobby', 'hobbies', 'game', 'toy', 'puzzle', 'chess',
           'music', 'guitar', 'piano', 'violin', 'painting',
           'brush', 'canvas', 'yarn', 'knitting', 'fishing',
           'sport', 'ball', 'dance', 'photography', 'camera'],
 
-        'инструменты': ['tools', 'tool', 'hammer', 'screwdriver', 'wrench',
+        'Инструменты': ['tools', 'tool', 'hammer', 'screwdriver', 'wrench',
           'drill', 'saw', 'pliers', 'tape', 'ruler',
           'ladder', 'nail', 'screw', 'bolt', 'painting',
           'brush', 'roller'],
 
-        'медицина': ['medical', 'medicine', 'health', 'first aid', 'bandage',
+        'Медицина': ['medical', 'medicine', 'health', 'first aid', 'bandage',
           'pill', 'tablet', 'syringe', 'thermometer', 'mask',
           'gloves', 'stethoscope', 'wheelchair', 'crutch'],
 
-        'канцелярия': ['stationery', 'office', 'pen', 'pencil', 'paper', 'notebook',
+        'Канцелярия': ['stationery', 'office', 'pen', 'pencil', 'paper', 'notebook',
           'folder', 'file', 'clip', 'stapler', 'scissors', 'glue',
           'tape', 'envelope', 'marker', 'highlighter', 'ruler',
           'eraser', 'calculator', 'calendar', 'notepad', 'clipboard'],
 
-        'животные' : ['dog', 'cat', 'bird', 'horse', 'lion', 'hamster',
+        'Животные' : ['dog', 'cat', 'bird', 'horse', 'lion', 'hamster',
           'wood rabbit', 'hare', 'Angora',],
 
       };

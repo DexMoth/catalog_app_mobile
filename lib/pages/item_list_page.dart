@@ -5,6 +5,7 @@ import 'package:catalog_app_mobile/pages/item_edit_page.dart';
 import 'package:catalog_app_mobile/pages/search_page.dart';
 import 'package:catalog_app_mobile/services/api_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../configuration/constants.dart';
 import '../models/item.dart';
@@ -38,6 +39,7 @@ class _ItemListPageState extends State<ItemListPage> {
     super.initState();
     _loadItems();
   }
+
 
   // загрузка вещей без родителя
   Future<void> _loadItems() async {
@@ -358,8 +360,10 @@ class _ItemListPageState extends State<ItemListPage> {
       description: _itemToMove!.description,
       imagePath: _itemToMove!.imagePath,
       parentId: newParentId,
-      categories: _itemToMove!.categories,
+      category: _itemToMove!.category,
       tags: _itemToMove!.tags,
+      createdAt: _itemToMove!.createdAt,
+      updatedAt: _itemToMove!.updatedAt,
     );
 
     try {

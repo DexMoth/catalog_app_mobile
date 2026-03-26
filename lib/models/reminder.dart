@@ -24,7 +24,8 @@ class Reminder {
     this.reminderDate,
     required this.isActive,
     required this.createdAt,
-    required this.updatedAt});
+    required this.updatedAt,
+  });
 
   factory Reminder.empty() {
     return Reminder(
@@ -33,7 +34,8 @@ class Reminder {
         isActive: true,
         reminderDate: DateTime.now(),
         createdAt: DateTime.now(),
-        updatedAt: DateTime.now());
+        updatedAt: DateTime.now()
+    );
   }
 
   factory Reminder.fromJson(Map<String, dynamic> json) {

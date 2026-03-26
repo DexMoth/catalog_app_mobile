@@ -26,6 +26,14 @@ dependencies:
   image_picker: 1.0.5
   mocktail: ^1.0.4
   google_mlkit_image_labeling: ^0.14.1
+  fl_chart: 0.69.0  # графики
+  #  для уведомлений
+  flutter_local_notifications: ^17.0.0
+  timezone: ^0.9.2
+  flutter_timezone: ^1.0.0  # локальный часовой пояс
+  shared_preferences: ^2.2.0 #для хранения пар ключ-значение
+  # для открытия настроек
+  app_settings: ^5.1.0
 
 dev_dependencies:
   flutter_test:

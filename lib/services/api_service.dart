@@ -47,9 +47,11 @@ class ApiService {
         'description': item.description,
         'imagePath': item.imagePath,
         'parentId': item.parentId,
-        'categories': item.categories,
+        'category': item.category,
         'tags': item.tags,
         'userId': _currentUserId,
+        'createdAt': item.createdAt.toIso8601String(),
+        'updatedAt': item.updatedAt.toIso8601String(),
       }),
     );
 
@@ -74,8 +76,10 @@ class ApiService {
           'description': item.description,
           'imagePath': item.imagePath,
           'parentId': item.parentId,
-          'categories': item.categories,
+          'category': item.category,
           'tags': item.tags,
+          'createdAt': item.createdAt.toIso8601String(),
+          'updatedAt': item.updatedAt.toIso8601String(),
         }),
       );
 
@@ -265,6 +269,19 @@ class ApiService {
     if (response.statusCode == 200) {
       final List<dynamic> jsonList = json.decode(response.body);
       return jsonList.map((json) => Category.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to load items: ${response.statusCode}');
+    }
+  }
+
+  Future<Category> getCategory(int id) async {
+    final url = _urlWithUserId('/category/$id');
+
+    final response = await http.get(Uri.parse(url));
+
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> jsonData = json.decode(response.body);
+      return Category.fromJson(jsonData);
     } else {
       throw Exception('Failed to load items: ${response.statusCode}');
     }

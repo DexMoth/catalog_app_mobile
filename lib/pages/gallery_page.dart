@@ -26,7 +26,7 @@ class _GalleryPageState extends State<GalleryPage> {
       ),
       body: Column(
         children: [
-          // Предпросмотр
+          // Предпросмотр'
           Expanded(
             child: _buildPreview(),
           ),

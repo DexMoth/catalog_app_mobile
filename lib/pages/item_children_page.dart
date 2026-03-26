@@ -394,8 +394,10 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
       description: _itemToMove!.description,
       imagePath: _itemToMove!.imagePath,
       parentId: newParentId,
-      categories: _itemToMove!.categories,
+      category: _itemToMove!.category,
       tags: _itemToMove!.tags,
+      createdAt: _itemToMove!.createdAt,
+      updatedAt: DateTime.now(),
     );
 
     try {

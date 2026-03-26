@@ -7,8 +7,10 @@ class Item {
   String? description;
   String? imagePath;
   int? parentId;
-  List<Category>? categories;
+  int? category;
   List<Tag>? tags;
+  DateTime createdAt;
+  DateTime updatedAt;
 
   Item({
     required this.id,
@@ -16,8 +18,10 @@ class Item {
     this.description,
     this.imagePath,
     this.parentId,
-    this.categories,
+    this.category,
     this.tags,
+    required this.createdAt,
+    required this.updatedAt,
   });
 
   factory Item.empty() {
@@ -27,20 +31,14 @@ class Item {
       description: null,
       imagePath: null,
       parentId: null,
-      categories: null,
+      category: null,
       tags: null,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now()
     );
   }
 
   factory Item.fromJson(Map<String, dynamic> json) {
-    // для категорий
-    List<Category>? categories;
-    if (json['categories'] != null) {
-      categories = (json['categories'] as List)
-          .map((categoryJson) => Category.fromJson(categoryJson))
-          .toList();
-    }
-
     // для тегов
     List<Tag>? tags;
     if (json['tags'] != null) {
@@ -55,8 +53,10 @@ class Item {
       description: json['description'] as String?,
       imagePath: json['imagePath'] as String?,
       parentId: json['parentId'] as int?,
-      categories: categories,
+      category: json['category'] as int?,
       tags: tags,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      updatedAt: DateTime.parse(json['updatedAt'] as String),
     );
   }
 
@@ -67,8 +67,10 @@ class Item {
       'description': description,
       'imagePath': imagePath,
       'parentId': parentId,
-      'categories': categories?.map((category) => category.toJson()).toList(),
+      'category': category,
       'tags': tags?.map((tag) => tag.toJson()).toList(),
+      'createdAt': createdAt.toIso8601String(),
+      'updatedAt': updatedAt.toIso8601String(),
     };
   }
 }

@@ -1,7 +1,17 @@
 import 'package:catalog_app_mobile/pages/item_list_page.dart';
+import 'package:catalog_app_mobile/services/api_service.dart';
+import 'package:catalog_app_mobile/services/notification_service.dart';
 import 'package:flutter/material.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // инициализация уведомлений
+  await NotificationService().init();
+  // запросить разрешения
+  await NotificationService().requestPermissions();
+  await NotificationService().rescheduleAll(await ApiService().getReminders());
+
   runApp(const MyApp());
 }
 

@@ -69,7 +69,7 @@ class ImageService {
         BoxFit fit = BoxFit.cover,
       }) {
     if (imagePath == null || imagePath.isEmpty) {
-      return _buildErrorWidget();
+      return buildErrorWidget();
     }
 
     // Base64 изображение
@@ -107,7 +107,7 @@ class ImageService {
     );
   }
 
-  static Widget _buildErrorWidget() {
+  static Widget buildErrorWidget() {
     return Container(
       color: Colors.grey[200],
       child: const Center(

@@ -34,6 +34,8 @@ void main() {
       id: 1,
       name: 'Моя книга',
       description: 'Интересная книга',
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
     );
 
     await tester.pumpWidget(
