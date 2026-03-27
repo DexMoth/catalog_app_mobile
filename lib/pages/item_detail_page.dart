@@ -84,7 +84,22 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
                   MaterialPageRoute(
                       builder: (context) => EditItemPage(item: _currentItem)
                   )
-              );
+              ).then((updatedItem) {
+                if (updatedItem != null && mounted) {
+                  setState(() {
+                    _currentItem = updatedItem;
+
+                    // если изменилась категория
+                    if (_currentItem.category != null) {
+                      _loadCategory();
+                    } else {
+                      _category = null;
+                    }
+                    // возвращаем обновленный предмет
+                    Navigator.pop(context, updatedItem);
+                  });
+                }
+              });
             },
             icon: const Icon(
                 Icons.edit,
@@ -257,8 +272,8 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
               ],
             ),
             const SizedBox(height: 12),
-            _buildInfoRow('Создано', '12.01.2024'),
-            _buildInfoRow('Обновлено', '15.01.2024'),
+            _buildInfoRow('Создано', _formatDate(_currentItem.createdAt)),
+            _buildInfoRow('Обновлено', _formatDate(_currentItem.updatedAt)),
           ],
         ),
       ),
@@ -493,6 +508,11 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
     });
   }
 
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'Не указано';
+    return '${date.day}.${date.month}.${date.year}';
+  }
+
   Widget _buildInfoRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -611,10 +631,13 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
             }
 
             return AlertDialog(
-              title: const Text('Выберите категорию'),
+              title: const Text(
+                  'Выберите категорию',
+                  style: TextStyle(fontSize: 20, fontStyle: FontStyle.italic),
+              ),
               content: SizedBox(
                 width: double.maxFinite,
-                height: 300,
+                height: 400,
                 child: ListView.builder(
                   itemCount: categories.length,
                   itemBuilder: (context, index) {

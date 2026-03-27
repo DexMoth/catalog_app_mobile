@@ -213,9 +213,19 @@ class _ItemListPageState extends State<ItemListPage> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
-                                      builder: (context) => ItemDetailPage(item: item),
-                                    ),
-                                  );
+                                      builder: (context) => ItemDetailPage(item: item)
+                                    )
+                                  ).then((updatedItem) {
+                                    // если предмет обновился
+                                    if (updatedItem != null && mounted) {
+                                      setState(() {
+                                        final index = _items.indexWhere((i) => i.id == updatedItem.id);
+                                        if (index != -1) {
+                                          _items[index] = updatedItem;
+                                        }
+                                      });
+                                    }
+                                  });
                                 },
                                 icon: const Icon(
                                     Icons.remove_red_eye,

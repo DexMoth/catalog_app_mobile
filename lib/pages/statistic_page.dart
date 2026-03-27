@@ -148,7 +148,7 @@ class _StatisticPageState extends State<StatisticPage> {
 
               const SizedBox(height: 30),
 
-              //_buildPopularTags(),
+              _buildPopularTags(),
               _buildActiveMonth(),
               const SizedBox(height: 30),
               _buildHotZones(),

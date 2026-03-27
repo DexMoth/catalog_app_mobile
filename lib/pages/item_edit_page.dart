@@ -517,6 +517,7 @@ class _EditItemPageState extends State<EditItemPage> {
 
   Widget _buildCategories(BuildContext context) {
     final itemCategories = _currentItem.category ?? null;
+    final hasSuggested = _suggestedCategory != null;
 
     return SizedBox(
       child: Column(
@@ -527,7 +528,7 @@ class _EditItemPageState extends State<EditItemPage> {
             spacing: 6,
             runSpacing: 1,
             children: [
-
+              // если есть выбранная категория
               if (itemCategories != null)
                 Chip(
                   label: Padding(
@@ -537,19 +538,6 @@ class _EditItemPageState extends State<EditItemPage> {
                       children: [
                         _buildCategoryWidget(),
                         const SizedBox(width: 4),
-                        GestureDetector(
-                          onTap: () {
-                            // Удаляем категорию при нажатии на крестик
-                            setState(() {
-                              _currentItem.category = null;
-                            });
-                          },
-                          child: const Icon(
-                            Icons.close,
-                            size: 14,
-                            color: Colors.brown,
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -558,7 +546,7 @@ class _EditItemPageState extends State<EditItemPage> {
                   padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
-              if (itemCategories != null)
+              if (itemCategories != null && !hasSuggested)
                 const Text(
                   'Категория не выбрана',
                   style: TextStyle(
@@ -600,23 +588,28 @@ class _EditItemPageState extends State<EditItemPage> {
           future: ApiService().getCategories(),
           builder: (context, snapshot) {
             final categories = snapshot.data ?? [];
-            final currentCategory = _currentItem.category == null
-                ? _currentItem.category
-                : null;
+
+            final sortedCategories = List<Category>.from(categories)
+              ..sort((a, b) => a.name.compareTo(b.name));
+
+            final currentCategory = _currentItem.category;
 
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
 
             return AlertDialog(
-              title: const Text('Выберите категорию'),
+              title: const Text(
+                'Выберите категорию',
+                style: TextStyle(fontSize: 20, fontStyle: FontStyle.italic),
+              ),
               content: SizedBox(
                 width: double.maxFinite,
-                height: 300,
+                height: 400,
                 child: ListView.builder(
-                  itemCount: categories.length,
+                  itemCount: sortedCategories.length,
                   itemBuilder: (context, index) {
-                    final category = categories[index];
+                    final category = sortedCategories[index];
                     final isSelected = currentCategory == category.id;
 
                     return ListTile(
@@ -670,11 +663,13 @@ class _EditItemPageState extends State<EditItemPage> {
   Future<void> _findCategoryForImage(File image) async {
     final category = await _classifierService.findCategory(image);
 
+
     if (category != null && mounted) {
       setState(() => _suggestedCategory = category);
 
       setState(() {
         _currentItem.category = category.id;
+        _category = category;
         _hasChanges = true;
       });
 
@@ -692,7 +687,6 @@ class _EditItemPageState extends State<EditItemPage> {
         ),
       );
     }
-
   }
 
   Widget _buildCategorySuggestionWidget() {
@@ -770,5 +764,11 @@ class _EditItemPageState extends State<EditItemPage> {
       print('Ошибка камеры: $e');
       _showErrorDialog('Не удалось сделать фото');
     }
+  }
+
+  void suggestCategory(Category category) {
+    setState(() {
+      _suggestedCategory = category;
+    });
   }
 }
