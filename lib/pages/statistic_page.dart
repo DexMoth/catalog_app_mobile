@@ -327,32 +327,54 @@ class _StatisticPageState extends State<StatisticPage> {
   }
 
   Widget _buildHotZones() {
-    final Map<int, Category> categoriesMap = {};
-    for (var cat in _categories) {
-      categoriesMap[cat.id] = cat;
-    }
-
-    final Map<String, int> zoneCount = {};
+    final Map<Item, int> childrenCount = {};
 
     for (var item in _items) {
-      if (item.category != null) {
-        // получаем категорию по ид
-        final category = categoriesMap[item.category];
-        if (category != null) {
-          final zoneName = category.name;
-          zoneCount[zoneName] = (zoneCount[zoneName] ?? 0) + 1;
+      childrenCount[item] = 0;
+    }
+
+    for (var item in _items) {
+      if (item.parentId != null) {
+        final parent = _items.firstWhere(
+              (i) => i.id == item.parentId,
+          orElse: () => Item.empty(),
+        );
+        if (parent.id != 0) {
+          childrenCount[parent] = (childrenCount[parent] ?? 0) + 1;
         }
       }
     }
 
-    // сортируем
-    final sortedZones = zoneCount.entries.toList()
+    // Убираем предметы без потомков
+    final itemsWithChildren = childrenCount.entries
+        .where((entry) => entry.value > 0)
+        .toList();
+
+    if (itemsWithChildren.isEmpty) {
+      return const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '"Горячие зоны"',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Нет предметов с вложенными вещами',
+            style: TextStyle(color: Colors.grey),
+          ),
+        ],
+      );
+    }
+
+    // Сортируем по количеству потомков
+    final sorted = itemsWithChildren.toList()
       ..sort((a, b) => b.value.compareTo(a.value));
 
-    //топ-5
-    final topZones = sortedZones.take(5).toList();
+    // Берем топ-5
+    final topZones = sorted.take(5).toList();
 
-    //максимум для шкалы
+    // Максимум для шкалы
     final maxCount = topZones.map((e) => e.value).reduce((a, b) => a > b ? a : b);
 
     return Column(
@@ -362,15 +384,18 @@ class _StatisticPageState extends State<StatisticPage> {
           '"Горячие зоны"',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
-        const Text(
-          'Места с наибольшим количеством вещей',
-          style: TextStyle(fontSize: 14, color: Colors.grey),
+        const SizedBox(height: 4),
+        Text(
+          'Предметы, в которых хранится больше всего вещей',
+          style: TextStyle(fontSize: 14, color: Colors.grey[600]),
         ),
         const SizedBox(height: 16),
 
-        // список
+        // Список
         ...topZones.map((entry) {
-          final percent = (entry.value / maxCount * 100).clamp(10, 100);
+          final item = entry.key;
+          final count = entry.value;
+          final percent = (count / maxCount * 100).clamp(10, 100);
 
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -380,15 +405,19 @@ class _StatisticPageState extends State<StatisticPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      entry.key,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                    Expanded(
+                      child: Text(
+                        item.name,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     Text(
-                      '${entry.value} шт.',
+                      '$count шт.',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
@@ -400,7 +429,7 @@ class _StatisticPageState extends State<StatisticPage> {
                 const SizedBox(height: 4),
                 Stack(
                   children: [
-                    // фоновая полоса
+                    // Фон
                     Container(
                       height: 8,
                       decoration: BoxDecoration(
@@ -408,7 +437,7 @@ class _StatisticPageState extends State<StatisticPage> {
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
-                    // заполненная полоса
+                    // Заполнение
                     Container(
                       height: 8,
                       width: MediaQuery.of(context).size.width * 0.7 * (percent / 100),
@@ -431,10 +460,9 @@ class _StatisticPageState extends State<StatisticPage> {
 
         const SizedBox(height: 8),
 
-        // если есть еще зоны
-        if (sortedZones.length > 5)
+        if (sorted.length > 5)
           Text(
-            'И ещё ${sortedZones.length - 5} зон...',
+            'И ещё ${sorted.length - 5} мест...',
             style: TextStyle(
               fontSize: 12,
               color: Colors.grey[600],
