@@ -334,9 +334,7 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
       final success = await ApiService().deleteItem(item.id);
       if (success) {
         Navigator.pop(context); // убрираем диалог
-        setState(() {
-          _children.removeWhere((i) => i.id == item.id);
-        });
+        await _loadChildren();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Элемент удален')),
         );

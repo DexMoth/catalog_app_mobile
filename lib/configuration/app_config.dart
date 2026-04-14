@@ -1,5 +1,16 @@
-// url локалхоста
-const String baseUrl = 'http://localhost:8080/api';
+import 'package:catalog_app_mobile/services/server_settings_service.dart';
 
-// url с мобилки через usb
-// const String baseUrl = 'http://192.168.1.14:8080/api';
+class AppConfig {
+  static String? _cachedBaseUrl;
+
+  static Future<String> get baseUrl async {
+    if (_cachedBaseUrl != null) return _cachedBaseUrl!;
+    _cachedBaseUrl = await ServerSettingsService.getBaseUrl();
+    return _cachedBaseUrl!;
+  }
+
+  // обновить кэш после изменения настроек
+  static void refresh() {
+    _cachedBaseUrl = null;
+  }
+}

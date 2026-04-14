@@ -13,17 +13,17 @@ class ApiService {
   static const int _currentUserId = 2;
 
   // вспомогательный метод для добавления userId к URL
-  String _urlWithUserId(String path) {
-    return '$baseUrl$path?userId=$_currentUserId';
+  Future<String> _urlWithUserId(String path) async {
+    final base = await AppConfig.baseUrl;
+    return '$base$path?userId=$_currentUserId';
   }
 
   Future<List<Item>> getItems({String searchQuery = ''}) async {
 
-    var url = _urlWithUserId('/item');
+    var url = await _urlWithUserId('/item');
 
     if (searchQuery.isNotEmpty) {
-      final query = Uri.encodeQueryComponent(searchQuery);
-      url += '?search=$query';
+      url += '&search=${Uri.encodeQueryComponent(searchQuery)}';
     }
 
     final response = await http.get(Uri.parse(url));
@@ -37,7 +37,7 @@ class ApiService {
   }
 
   Future<Item> createItem(Item item) async {
-    var url = _urlWithUserId('/item');
+    var url = await _urlWithUserId('/item');
 
     final response = await http.post(
       Uri.parse(url),
@@ -63,7 +63,7 @@ class ApiService {
   }
 
   Future<Item> updateItem(Item item) async {
-    var url = _urlWithUserId('/item/${item.id}');
+    var url = await _urlWithUserId('/item/${item.id}');
 
     try {
       final response = await http.put(
@@ -98,7 +98,7 @@ class ApiService {
 
   // обновление только тегов
   Future<void> updateItemTags(int itemId, List<int> tags) async {
-    var url = _urlWithUserId('/item/$itemId/tags');
+    var url = await _urlWithUserId('/item/$itemId/tags');
 
     try {
       final response = await http.patch(
@@ -117,7 +117,7 @@ class ApiService {
 
   // обновление только категорий
   Future<void> updateItemCategories(int itemId, List<int> categories) async {
-    var url = _urlWithUserId('/item/$itemId/categories');
+    var url = await _urlWithUserId('/item/$itemId/categories');
 
     try {
       final response = await http.patch(
@@ -135,7 +135,7 @@ class ApiService {
   }
 
   Future<List<Item>> getChildrenItems(int parentId) async {
-    final url = _urlWithUserId('/item/$parentId/children');
+    var url = await await _urlWithUserId('/item/$parentId/children');
     final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
@@ -147,7 +147,7 @@ class ApiService {
   }
 
   Future<List<Item>> getItemsWithoutParent() async {
-    var url = _urlWithUserId('/item/roots');
+    var url = await _urlWithUserId('/item/roots');
     final response = await http.get(Uri.parse(url));
 
     if (response.statusCode == 200) {
@@ -159,7 +159,7 @@ class ApiService {
   }
 
   Future<bool> deleteItem(int itemId) async {
-   var url = _urlWithUserId('/item/$itemId');
+   var url = await _urlWithUserId('/item/$itemId');
 
     try {
       final response = await http.delete(
@@ -181,7 +181,7 @@ class ApiService {
 
   ///////////////// ТЕГИ //////////////
   Future<List<Tag>> getTags() async {
-    final url = _urlWithUserId('/tag');
+    var url = await _urlWithUserId('/tag');
 
     final response = await http.get(Uri.parse(url));
 
@@ -194,7 +194,7 @@ class ApiService {
   }
 
   Future<Tag> createTag(String name) async {
-    final url = _urlWithUserId('/tag');
+    var url = await _urlWithUserId('/tag');
 
     final response = await http.post(
       Uri.parse(url),
@@ -213,7 +213,7 @@ class ApiService {
   }
 
   Future<Tag> updateTag(Tag tag) async {
-    final url = _urlWithUserId('/tag/${tag.id}');
+    var url = await _urlWithUserId('/tag/${tag.id}');
 
     try {
       final response = await http.put(
@@ -241,7 +241,7 @@ class ApiService {
   }
 
   Future<bool> deleteTag(int tagId) async {
-    final url = _urlWithUserId('/tag/$tagId');
+    var url = await _urlWithUserId('/tag/$tagId');
 
     try {
       final response = await http.delete(
@@ -262,7 +262,7 @@ class ApiService {
 
   ///////////////// КАТЕГОРИИ //////////////
   Future<List<Category>> getCategories() async {
-    final url = _urlWithUserId('/category');
+    var url = await _urlWithUserId('/category');
 
     final response = await http.get(Uri.parse(url));
 
@@ -275,7 +275,7 @@ class ApiService {
   }
 
   Future<Category> getCategory(int id) async {
-    final url = _urlWithUserId('/category/$id');
+    var url = await _urlWithUserId('/category/$id');
 
     final response = await http.get(Uri.parse(url));
 
@@ -288,7 +288,7 @@ class ApiService {
   }
 
   Future<Category> createCategory(String name) async {
-    final url = _urlWithUserId('/category');
+    var url = await _urlWithUserId('/category');
 
     final response = await http.post(
       Uri.parse(url),
@@ -307,7 +307,7 @@ class ApiService {
   }
 
   Future<Category> updateCategory(Category category) async {
-    final url = _urlWithUserId('/category/${category.id}');
+    var url = await _urlWithUserId('/category/${category.id}');
 
     try {
       final response = await http.put(
@@ -334,7 +334,7 @@ class ApiService {
   }
 
   Future<bool> deleteCategory(int categoryId) async {
-    final url = _urlWithUserId('/category/$categoryId');
+    var url = await _urlWithUserId('/category/$categoryId');
 
     try {
       final response = await http.delete(
@@ -356,7 +356,7 @@ class ApiService {
 // reminders
 
   Future<List<Reminder>> getReminders() async {
-    final url = _urlWithUserId('/reminder');
+    var url = await _urlWithUserId('/reminder');
 
     final response = await http.get(Uri.parse(url));
 
@@ -369,7 +369,7 @@ class ApiService {
   }
 
   Future<Reminder> createReminder(Reminder reminder) async {
-    final url = _urlWithUserId('/reminder');
+    var url = await _urlWithUserId('/reminder');
 
     final response = await http.post(
       Uri.parse(url),
@@ -397,7 +397,7 @@ class ApiService {
   }
 
   Future<Reminder> updateReminder(Reminder reminder) async {
-    final url = _urlWithUserId('/reminder/${reminder.id}');
+    var url = await _urlWithUserId('/reminder/${reminder.id}');
 
     try {
       final response = await http.put(
@@ -435,7 +435,8 @@ class ApiService {
 
   Future<void> updateReminderActive(int reminderId, bool isActive) async {
     try {
-      final url = '$baseUrl/reminder/$reminderId/active?isActive=$isActive';
+      final base = await AppConfig.baseUrl;
+      final url = '$base/reminder/$reminderId/active?isActive=$isActive';
       final response = await http.put(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
@@ -450,7 +451,7 @@ class ApiService {
   }
 
   Future<bool> deleteReminder(int reminderId) async {
-    final url = _urlWithUserId('/reminder/$reminderId');
+    var url = await _urlWithUserId('/reminder/$reminderId');
 
     try {
       final response = await http.delete(

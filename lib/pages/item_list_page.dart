@@ -300,9 +300,7 @@ class _ItemListPageState extends State<ItemListPage> {
       final success = await ApiService().deleteItem(item.id);
       if (success) {
         Navigator.pop(context); // убрираем диалог
-        setState(() {
-          _items.removeWhere((i) => i.id == item.id);
-        });
+        await _loadItems(); // чтобы перезагрузились потомки удаленного
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Элемент удален')),
         );
