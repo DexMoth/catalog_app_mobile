@@ -11,6 +11,7 @@ import '../services/api_service.dart';
 import '../services/image_classifier_service .dart';
 import '../services/image_service.dart';
 import '../services/image_storage.dart';
+import '../services/ocr_service.dart';
 
 class EditItemPage extends StatefulWidget {
   final ApiService? apiService;
@@ -24,7 +25,9 @@ class EditItemPage extends StatefulWidget {
 }
 
 class _EditItemPageState extends State<EditItemPage> {
+  final OcrService _ocrService = OcrService();
   final ApiService _apiService = ApiService();
+
   Category? _category;
   late Item _currentItem;
   late TextEditingController _nameController;
@@ -476,9 +479,11 @@ class _EditItemPageState extends State<EditItemPage> {
         if (kIsWeb) {
           // Для веба - создаем временный файл из base64 для ML Kit
           await _findCategoryForImage(imageData as File);
+          await _processImage(imageData);
         } else {
           // Для мобилок - используем файл
           await _findCategoryForImage(File(pickedFile.path));
+          await _processImage(pickedFile.path);
         }
       }
     } catch (e) {
@@ -657,6 +662,22 @@ class _EditItemPageState extends State<EditItemPage> {
           },
         );
       },
+    );
+  }
+
+  Future<void> _processImage(String imagePath) async {
+    final recognizedText = await _ocrService.recognizeText(imagePath);
+
+    setState(() {
+      _nameController.text = recognizedText;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Название обновлено: "$recognizedText"'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: Colors.green,
+      ),
     );
   }
 
