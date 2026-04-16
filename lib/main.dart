@@ -1,7 +1,30 @@
 import 'package:catalog_app_mobile/pages/item_list_page.dart';
+import 'package:catalog_app_mobile/services/api_service.dart';
+import 'package:catalog_app_mobile/services/notification_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // инициализация уведомлений
+  await NotificationService().init();
+  // запросить разрешения
+  await NotificationService().requestPermissions();
+
+  // иначе приложение падает
+  if (!kIsWeb) {
+    try {
+      final reminders = await ApiService().getReminders();
+      await NotificationService().rescheduleAll(reminders);
+    } catch (e) {
+      print('⚠️ Ошибка при перепланировании уведомлений: $e');
+    }
+  } else {
+    print('ℹ️ Уведомления не поддерживаются на Web');
+  }
+
+
   runApp(const MyApp());
 }
 

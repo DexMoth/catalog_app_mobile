@@ -205,8 +205,8 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
               child: Row(
                 children: [
                   // Изображение
-                  SizedBox(
-                    width: 140,
+                  Expanded(
+                    flex: 1,
                     child: _buildImage(item),
                   ),
                   // Текст и иконки
@@ -300,7 +300,7 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
     } else {
       return Container(
         color: Colors.grey[200],
-        child: Icon(Icons.photo, color: Colors.grey[400]),
+        child: Icon(Icons.photo, size: 40, color: Colors.grey[400]),
       );
     }
   }
@@ -334,9 +334,7 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
       final success = await ApiService().deleteItem(item.id);
       if (success) {
         Navigator.pop(context); // убрираем диалог
-        setState(() {
-          _children.removeWhere((i) => i.id == item.id);
-        });
+        await _loadChildren();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Элемент удален')),
         );
@@ -394,8 +392,10 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
       description: _itemToMove!.description,
       imagePath: _itemToMove!.imagePath,
       parentId: newParentId,
-      categories: _itemToMove!.categories,
+      category: _itemToMove!.category,
       tags: _itemToMove!.tags,
+      createdAt: _itemToMove!.createdAt,
+      updatedAt: DateTime.now(),
     );
 
     try {

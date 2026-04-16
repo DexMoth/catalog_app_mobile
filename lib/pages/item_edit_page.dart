@@ -1,30 +1,34 @@
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:path/path.dart' as path;
+import 'package:flutter/foundation.dart' show kIsWeb;
 
-import 'package:catalog_app_mobile/pages/take_photo_page.dart';
-import 'package:catalog_app_mobile/services/camera_service.dart';
 import 'package:flutter/material.dart';
-// import 'package:gallery_picker/gallery_picker.dart';
-// import 'package:gallery_picker/models/media_file.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/category.dart';
 import '../models/item.dart';
 import '../services/api_service.dart';
 import '../services/image_classifier_service .dart';
 import '../services/image_service.dart';
-import 'gallery_page.dart';
+import '../services/image_storage.dart';
+import '../services/ocr_service.dart';
 
 class EditItemPage extends StatefulWidget {
+  final ApiService? apiService;
   final Item? item;
   final int? parentId;
 
-  const EditItemPage({super.key, this.item, this.parentId});
+  const EditItemPage({super.key, this.item, this.parentId, this.apiService});
 
   @override
   State<EditItemPage> createState() => _EditItemPageState();
 }
 
 class _EditItemPageState extends State<EditItemPage> {
+  final OcrService _ocrService = OcrService();
+  final ApiService _apiService = ApiService();
+
+  Category? _category;
   late Item _currentItem;
   late TextEditingController _nameController;
   late TextEditingController _descriptionController;
@@ -43,6 +47,7 @@ class _EditItemPageState extends State<EditItemPage> {
   void initState() {
     super.initState();
     _isCreating = widget.item == null;
+    _loadCategory();
     _classifierService = ImageClassifierService();
 
     // если передан parentId
@@ -163,26 +168,69 @@ class _EditItemPageState extends State<EditItemPage> {
   }
 
   Widget _buildImagePreview() {
-    if (_selectedImagePath != null) {
+    if (kIsWeb) {
+      // Для веба используем base64
+      if (_selectedImageBase64 != null) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: ImageService.buildBase64Image(
+            _selectedImageBase64!,
+            fit: BoxFit.cover,
+          ),
+        );
+      } else  if (_selectedImagePath != null) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.file(
+            File(_selectedImagePath!),
+            fit: BoxFit.cover,
+            key: ValueKey(_selectedImagePath),  // ← добавляем ключ
+            errorBuilder: (context, error, stackTrace) {
+              return ImageService.buildErrorWidget();
+            },
+          ),
+        );
+      }
+    } else {
+      // Для мобилок используем File
+      if (_selectedImagePath != null) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.file(
+            File(_selectedImagePath!),
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return ImageService.buildErrorWidget();
+            },
+          ),
+        );
+      } else if (_currentItem.imagePath != null &&
+          File(_currentItem.imagePath!).existsSync()) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Image.file(
+            File(_currentItem.imagePath!),
+            fit: BoxFit.cover,
+            errorBuilder: (context, error, stackTrace) {
+              return ImageService.buildErrorWidget();
+            },
+          ),
+        );
+      }
+    }
+
+    // Если ничего нет - проверяем base64 в любом случае
+    if (_selectedImageBase64 != null) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: Image.file(
-          File(_selectedImagePath!),
+        child: ImageService.buildBase64Image(
+          _selectedImageBase64!,
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            print('Ошибка загрузки файла: $error');
-            return _buildFallbackImage();
-          },
         ),
       );
     }
 
-    if (_selectedImageBase64 != null && _selectedImageBase64!.isNotEmpty) {
-      return _buildBase64Image(_selectedImageBase64!);
-    }
-
-    // Если нет изображения
-    return _buildFallbackImage();
+    return ImageService.buildErrorWidget();
   }
 
   Widget _buildBase64Image(String base64String) {
@@ -316,25 +364,22 @@ class _EditItemPageState extends State<EditItemPage> {
     }
 
     // картинка
-    String? finalImagePath = _currentItem.imagePath;
+    String? finalImagePath = _selectedImageBase64;
 
     //если новое фото
     if (_selectedImagePath != null) {
       try {
-        // Читаем файл и конвертируем в base64
-        final file = File(_selectedImagePath!);
-        if (await file.exists()) {
-          final base64Image = ImageService.imageFileToBase64(file);
-          if (base64Image != null) {
-            finalImagePath = base64Image;
-            _selectedImageBase64 = base64Image;
-          } else {
-            throw Exception('Не удалось конвертировать изображение');
-          }
+        final sourceFile = File(_selectedImagePath!);
+        final savedPath = await ImageStorageService().saveImageFromFile(
+          sourceFile,
+          fileName: 'item_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        );
+
+        if (savedPath != null) {
+          finalImagePath = savedPath;
         }
       } catch (e) {
-        print('Ошибка конвертации изображения: $e');
-        finalImagePath = _currentItem.imagePath;
+        print('Ошибка сохранения фото: $e');
       }
     }
 
@@ -344,7 +389,9 @@ class _EditItemPageState extends State<EditItemPage> {
       description: _descriptionController.text.trim(),
       imagePath: finalImagePath,
       parentId: _currentItem.parentId,
-      categories: _currentItem.categories,
+      category: _currentItem.category,
+      createdAt: _currentItem.createdAt,
+      updatedAt: DateTime.now(),
     );
 
     try {
@@ -393,39 +440,89 @@ class _EditItemPageState extends State<EditItemPage> {
   }
 
   Future<void> _selectFromGallery() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => GalleryPage()),
-    );
+    final ImagePicker _picker = ImagePicker();
 
-    // путь
-    if (result != null && result is String) {
-      setState(() {
-        _selectedImagePath = result;
-      });
-      // предложение категорий
-      await _findCategoryForImage(File(result));
+    try {
+      final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+
+      if (pickedFile != null) {
+        // Очищаем кэш, чтобы обновилось
+        if (_currentItem.imagePath != null && !kIsWeb) {
+          final oldImageProvider = FileImage(File(_currentItem.imagePath!));
+          imageCache.evict(oldImageProvider);
+        }
+
+        // Читаем байты изображения
+        final bytes = await pickedFile.readAsBytes();
+
+        // Сохраняем как base64 для всех платформ
+        final base64String = base64Encode(bytes);
+
+        // Определяем mime-type
+        final extension = path.extension(pickedFile.name).toLowerCase();
+        String mimeType = 'image/jpeg';
+        if (extension == '.png') mimeType = 'image/png';
+        else if (extension == '.gif') mimeType = 'image/gif';
+        else if (extension == '.webp') mimeType = 'image/webp';
+
+        // Формируем data URL
+        final imageData = 'data:$mimeType;base64,$base64String';
+
+        // Обновляем состояние
+        setState(() {
+          _selectedImageBase64 = imageData;
+          _selectedImagePath = null;
+          _currentItem.imagePath = imageData; // ← сохраняем в поле
+        });
+
+        // Предложение категории (для мобилок - через файл, для веба - через base64)
+        if (kIsWeb) {
+          // Для веба - создаем временный файл из base64 для ML Kit
+          await _findCategoryForImage(imageData as File);
+          await _processImage(imageData);
+        } else {
+          // Для мобилок - используем файл
+          await _findCategoryForImage(File(pickedFile.path));
+          await _processImage(pickedFile.path);
+        }
+      }
+    } catch (e) {
+      print('Ошибка выбора изображения: $e');
+      _showErrorDialog('Не удалось выбрать изображение');
     }
   }
 
-  Future<void> _takePhoto() async {
-    final result = await Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => TakePhotoPage()),
-    );
-
-    // путь к фото
-    if (result != null && result is String) {
-      setState(() {
-        _selectedImagePath = result;
-      });
-      // предложение категорий
-      await _findCategoryForImage(File(result));
+  Future<void> _loadCategory() async {
+    if (_currentItem.category != null) {
+      final cat = await _apiService.getCategory(_currentItem.category!);
+      if (mounted) {
+        setState(() {
+          _category = cat;
+        });
+      }
     }
+  }
+
+  Widget _buildCategoryWidget() {
+    // если не выбрана
+    if (_currentItem.category == null) {
+      return const Text('Категория не выбрана');
+    }
+
+    // если загружается
+    if (_category == null) {
+      return const SizedBox(height:  14);
+    }
+
+    return Text(
+      _category!.name,
+      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+    );
   }
 
   Widget _buildCategories(BuildContext context) {
-    final itemCategories = _currentItem.categories ?? [];
+    final itemCategories = _currentItem.category ?? null;
+    final hasSuggested = _suggestedCategory != null;
 
     return SizedBox(
       child: Column(
@@ -436,35 +533,16 @@ class _EditItemPageState extends State<EditItemPage> {
             spacing: 6,
             runSpacing: 1,
             children: [
-
-              if (itemCategories.isNotEmpty)
+              // если есть выбранная категория
+              if (itemCategories != null)
                 Chip(
                   label: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(
-                          itemCategories.first.name,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                        _buildCategoryWidget(),
                         const SizedBox(width: 4),
-                        GestureDetector(
-                          onTap: () {
-                            // Удаляем категорию при нажатии на крестик
-                            setState(() {
-                              _currentItem.categories = [];
-                            });
-                          },
-                          child: const Icon(
-                            Icons.close,
-                            size: 14,
-                            color: Colors.brown,
-                          ),
-                        ),
                       ],
                     ),
                   ),
@@ -473,7 +551,7 @@ class _EditItemPageState extends State<EditItemPage> {
                   padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
                 ),
-              if (itemCategories.isEmpty)
+              if (itemCategories != null && !hasSuggested)
                 const Text(
                   'Категория не выбрана',
                   style: TextStyle(
@@ -493,7 +571,7 @@ class _EditItemPageState extends State<EditItemPage> {
                     border: Border.all(color: Colors.brown.withOpacity(0.3)),
                   ),
                   child: Icon(
-                    itemCategories.isEmpty ? Icons.add : Icons.edit,
+                    itemCategories == null ? Icons.add : Icons.edit,
                     size: 18,
                     color: Colors.brown,
                   ),
@@ -515,24 +593,29 @@ class _EditItemPageState extends State<EditItemPage> {
           future: ApiService().getCategories(),
           builder: (context, snapshot) {
             final categories = snapshot.data ?? [];
-            final currentCategory = _currentItem.categories?.isNotEmpty == true
-                ? _currentItem.categories!.first
-                : null;
+
+            final sortedCategories = List<Category>.from(categories)
+              ..sort((a, b) => a.name.compareTo(b.name));
+
+            final currentCategory = _currentItem.category;
 
             if (snapshot.connectionState == ConnectionState.waiting) {
               return const Center(child: CircularProgressIndicator());
             }
 
             return AlertDialog(
-              title: const Text('Выберите категорию'),
+              title: const Text(
+                'Выберите категорию',
+                style: TextStyle(fontSize: 20, fontStyle: FontStyle.italic),
+              ),
               content: SizedBox(
                 width: double.maxFinite,
-                height: 300,
+                height: 400,
                 child: ListView.builder(
-                  itemCount: categories.length,
+                  itemCount: sortedCategories.length,
                   itemBuilder: (context, index) {
-                    final category = categories[index];
-                    final isSelected = currentCategory?.id == category.id;
+                    final category = sortedCategories[index];
+                    final isSelected = currentCategory == category.id;
 
                     return ListTile(
                       title: Text(category.name),
@@ -541,10 +624,12 @@ class _EditItemPageState extends State<EditItemPage> {
                         setState(() {
                           if (isSelected) {
                             // Если уже выбрана - убираем
-                            _currentItem.categories = [];
+                            _currentItem.category = null;
+                            _category = null;
                           } else {
                             // Выбираем новую
-                            _currentItem.categories = [category];
+                            _currentItem.category = category.id;
+                            _category = category;
                           }
                           _hasChanges = true;
                         });
@@ -563,7 +648,7 @@ class _EditItemPageState extends State<EditItemPage> {
                   TextButton(
                     onPressed: () {
                       setState(() {
-                        _currentItem.categories = [];
+                        _currentItem.category = null;
                       });
                       Navigator.pop(context);
                     },
@@ -580,14 +665,32 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
+  Future<void> _processImage(String imagePath) async {
+    final recognizedText = await _ocrService.recognizeText(imagePath);
+
+    setState(() {
+      _nameController.text = recognizedText;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Название обновлено: "$recognizedText"'),
+        duration: const Duration(seconds: 2),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
   Future<void> _findCategoryForImage(File image) async {
     final category = await _classifierService.findCategory(image);
+
 
     if (category != null && mounted) {
       setState(() => _suggestedCategory = category);
 
       setState(() {
-        _currentItem.categories = [category];
+        _currentItem.category = category.id;
+        _category = category;
         _hasChanges = true;
       });
 
@@ -597,14 +700,21 @@ class _EditItemPageState extends State<EditItemPage> {
           duration: Duration(seconds: 2),
         ),
       );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Подходящих категорий не найдено'),
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
   }
 
   Widget _buildCategorySuggestionWidget() {
     if (_suggestedCategory == null) return SizedBox.shrink();
 
-    final current = _currentItem.categories?.firstOrNull;
-    final isSelected = current?.id == _suggestedCategory!.id;
+    final current = _currentItem.category;
+    final isSelected = current == _suggestedCategory!.id;
 
     return Container(
       margin: EdgeInsets.only(bottom: 8),
@@ -628,7 +738,7 @@ class _EditItemPageState extends State<EditItemPage> {
             TextButton(
               onPressed: () {
                 setState(() {
-                  _currentItem.categories = [_suggestedCategory!];
+                  _currentItem.category = _suggestedCategory?.id;
                   _hasChanges = true;
                 });
               },
@@ -638,5 +748,48 @@ class _EditItemPageState extends State<EditItemPage> {
         ],
       ),
     );
+  }
+
+  Future<void> _takePhoto() async {
+    final ImagePicker _picker = ImagePicker();
+
+    try {
+      final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
+
+      if (photo != null) {
+        // очищаем кеш
+        if (_currentItem.imagePath != null && !kIsWeb) {
+          final oldImageProvider = FileImage(File(_currentItem.imagePath!));
+          imageCache.evict(oldImageProvider);
+        }
+
+        if (kIsWeb) {
+          final bytes = await photo.readAsBytes();
+          final base64String = base64Encode(bytes);
+          final extension = path.extension(photo.name).toLowerCase();
+          String mimeType = 'image/jpeg';
+          if (extension == '.png') mimeType = 'image/png';
+
+          setState(() {
+            _selectedImageBase64 = 'data:$mimeType;base64,$base64String';
+            _selectedImagePath = null;
+          });
+        } else {
+          setState(() {
+            _selectedImagePath = photo.path;
+            _selectedImageBase64 = null;
+          });
+        }
+      }
+    } catch (e) {
+      print('Ошибка камеры: $e');
+      _showErrorDialog('Не удалось сделать фото');
+    }
+  }
+
+  void suggestCategory(Category category) {
+    setState(() {
+      _suggestedCategory = category;
+    });
   }
 }

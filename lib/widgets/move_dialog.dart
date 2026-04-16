@@ -284,8 +284,10 @@ class _MoveDialogState extends State<MoveDialog> {
         description: widget.itemToMove.description,
         imagePath: widget.itemToMove.imagePath,
         parentId: newParentId,
-        categories: widget.itemToMove.categories,
+        category: widget.itemToMove.category,
         tags: widget.itemToMove.tags,
+        createdAt: widget.itemToMove.createdAt,
+        updatedAt: DateTime.now(),
       );
 
       await ApiService().updateItem(updatedItem);

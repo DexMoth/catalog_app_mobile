@@ -8,27 +8,60 @@ import '../services/api_service.dart';
 import 'item_edit_page.dart';
 
 class ItemDetailPage extends StatefulWidget  {
+  final ApiService? apiService;
   final Item item;
 
-  const ItemDetailPage({super.key, required this.item});
+  const ItemDetailPage({super.key, required this.item, this.apiService});
 
   @override
   State<ItemDetailPage> createState() => _ItemDetailPageState();
 }
 
 class _ItemDetailPageState extends State<ItemDetailPage>{
+  final ApiService _apiService = ApiService();
   late Item _currentItem;
+  Category? _category;
   bool _hasChanges = false;
 
   @override
   void initState() {
     super.initState();
     _currentItem = widget.item;
+    _loadCategory();
+  }
+
+  Future<void> _loadCategory() async {
+    if (_currentItem.category != null) {
+      final cat = await _apiService.getCategory(_currentItem.category!);
+      if (mounted) {
+        setState(() {
+          _category = cat;
+        });
+      }
+    }
+  }
+
+  Widget _buildCategoryWidget() {
+    // если не выбрана
+    if (_currentItem.category == null) {
+      return const Text('Категория не выбрана');
+    }
+
+    // если загружается
+    if (_category == null) {
+      return const SizedBox(height:  14);
+    }
+
+    return Text(
+      _category!.name,
+      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+    );
   }
 
   @override
   // закрытие
   void dispose() {
+    _currentItem.updatedAt = DateTime.now();
     // сохраняем изменения
     if (_hasChanges) {
       _saveChanges();
@@ -51,7 +84,22 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
                   MaterialPageRoute(
                       builder: (context) => EditItemPage(item: _currentItem)
                   )
-              );
+              ).then((updatedItem) {
+                if (updatedItem != null && mounted) {
+                  setState(() {
+                    _currentItem = updatedItem;
+
+                    // если изменилась категория
+                    if (_currentItem.category != null) {
+                      _loadCategory();
+                    } else {
+                      _category = null;
+                    }
+                    // возвращаем обновленный предмет
+                    Navigator.pop(context, updatedItem);
+                  });
+                }
+              });
             },
             icon: const Icon(
                 Icons.edit,
@@ -224,8 +272,8 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
               ],
             ),
             const SizedBox(height: 12),
-            _buildInfoRow('Создано', '12.01.2024'),
-            _buildInfoRow('Обновлено', '15.01.2024'),
+            _buildInfoRow('Создано', _formatDate(_currentItem.createdAt)),
+            _buildInfoRow('Обновлено', _formatDate(_currentItem.updatedAt)),
           ],
         ),
       ),
@@ -233,7 +281,7 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
   }
 
   Widget _buildCategories(BuildContext context) {
-    final itemCategories = _currentItem.categories ?? [];
+    final itemCategories = _currentItem.category;
 
     return SizedBox(
       child: Column(
@@ -244,45 +292,44 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
             spacing: 6,
             runSpacing: 1,
             children: [
-              // Показываем только первую категорию (если есть)
-              if (itemCategories.isNotEmpty)
-                Chip(
-                  label: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          itemCategories.first.name,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        GestureDetector(
-                          onTap: () {
-                            // Удаляем категорию при нажатии на крестик
-                            setState(() {
-                              _currentItem.categories = [];
-                            });
-                          },
+              if (itemCategories != null)
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.brown.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Текст категории
+                      Padding(
+                        padding: const EdgeInsets.only(left: 12, right: 4, top: 6, bottom: 6),
+                        child: _buildCategoryWidget(),
+                      ),
+                      // Крестик для удаления
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _currentItem.category = null;
+                            _category = null;
+                            _hasChanges = true;
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          margin: const EdgeInsets.only(right: 4),
                           child: const Icon(
                             Icons.close,
-                            size: 14,
+                            size: 16,
                             color: Colors.brown,
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  backgroundColor: Colors.brown.withOpacity(0.1),
-                  labelStyle: const TextStyle(color: Colors.brown),
-                  padding: EdgeInsets.zero,
-                  visualDensity: VisualDensity.compact,
                 ),
               // Сообщение если нет категорий
-              if (itemCategories.isEmpty)
+              if (itemCategories == null)
                 const Text(
                   'Категория не выбрана',
                   style: TextStyle(
@@ -291,7 +338,7 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
                     fontSize: 12,
                   ),
                 ),
-              // Кнопка добавления категории - ВСЕГДА показывается
+              // Кнопка добавления категории
               IconButton(
                 onPressed: () {
                   _showDialogAddCategory(context);
@@ -303,12 +350,13 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
                     border: Border.all(color: Colors.brown.withOpacity(0.3)),
                   ),
                   child: Icon(
-                    itemCategories.isEmpty ? Icons.add : Icons.edit,
+                    itemCategories == null ? Icons.add : Icons.edit,
                     size: 18,
                     color: Colors.brown,
                   ),
                 ),
                 padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
               ),
             ],
           ),
@@ -460,6 +508,11 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
     });
   }
 
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'Не указано';
+    return '${date.day}.${date.month}.${date.year}';
+  }
+
   Widget _buildInfoRow(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -569,8 +622,8 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
           future: ApiService().getCategories(),
           builder: (context, snapshot) {
             final categories = snapshot.data ?? [];
-            final currentCategory = _currentItem.categories?.isNotEmpty == true
-                ? _currentItem.categories!.first
+            final currentCategory = _currentItem.category == null
+                ? _currentItem.category
                 : null;
 
             if (snapshot.connectionState == ConnectionState.waiting) {
@@ -578,15 +631,18 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
             }
 
             return AlertDialog(
-              title: const Text('Выберите категорию'),
+              title: const Text(
+                  'Выберите категорию',
+                  style: TextStyle(fontSize: 20, fontStyle: FontStyle.italic),
+              ),
               content: SizedBox(
                 width: double.maxFinite,
-                height: 300,
+                height: 400,
                 child: ListView.builder(
                   itemCount: categories.length,
                   itemBuilder: (context, index) {
                     final category = categories[index];
-                    final isSelected = currentCategory?.id == category.id;
+                    final isSelected = currentCategory == category.id;
 
                     return ListTile(
                       title: Text(category.name),
@@ -595,10 +651,12 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
                         setState(() {
                           if (isSelected) {
                             // Если уже выбрана - убираем
-                            _currentItem.categories = [];
+                            _currentItem.category = null;
+                            _category = null;
                           } else {
                             // Выбираем новую
-                            _currentItem.categories = [category];
+                            _currentItem.category = category.id;
+                            _category = category;
                           }
                           _hasChanges = true;
                         });
@@ -617,7 +675,7 @@ class _ItemDetailPageState extends State<ItemDetailPage>{
                   TextButton(
                     onPressed: () {
                       setState(() {
-                        _currentItem.categories = [];
+                        _currentItem.category = null;
                       });
                       Navigator.pop(context);
                     },
