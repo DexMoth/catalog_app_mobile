@@ -4,7 +4,7 @@ import 'package:tesseract_ocr/ocr_engine_config.dart';
 class OcrService {
   Future<String> recognizeText(String imagePath) async {
     try {
-      final rusText = await TesseractOcr.extractText(
+      var rusText = await TesseractOcr.extractText(
         imagePath,
         config: OCRConfig(
             language: 'rus',
@@ -12,14 +12,16 @@ class OcrService {
         ),
       );
 
-      // если есть кириллица, переключаемся на русский
-      //if (_containsCyrillic(rusText)) {
-      //  final engText = await TesseractOcr.extractText(
-      //    imagePath,
-      //    config: OCRConfig(language: 'eng', engine: OCREngine.tesseract),
-      //   );
-      //  return engText.isNotEmpty ? engText : rusText;
-      //}
+      if (rusText == "") {
+        rusText = await TesseractOcr.extractText(
+          imagePath,
+          config: OCRConfig(
+            language: 'eng',
+            engine: OCREngine.tesseract,
+          ),
+        );
+      }
+
       var text = _cleanText(rusText);
       return text;
     } catch (e) {
@@ -35,6 +37,12 @@ class OcrService {
     // убираем множественные пробелы
     cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ');
     cleaned = cleaned.trim();
+
+    // обрезаем до 3 слов
+    final words = cleaned.split(' ');
+    if (words.length > 3) {
+      cleaned = words.take(3).join(' ');
+    }
 
     return cleaned;
   }
