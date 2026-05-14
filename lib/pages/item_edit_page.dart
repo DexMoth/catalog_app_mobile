@@ -12,6 +12,8 @@ import '../services/image_classifier_service .dart';
 import '../services/image_service.dart';
 import '../services/image_storage.dart';
 import '../services/ocr_service.dart';
+import '../services/efficientnet_classifier.dart';
+import '../utils/label_translations.dart';
 
 class EditItemPage extends StatefulWidget {
   final ApiService? apiService;
@@ -27,6 +29,11 @@ class EditItemPage extends StatefulWidget {
 class _EditItemPageState extends State<EditItemPage> {
   final OcrService _ocrService = OcrService();
   final ApiService _apiService = ApiService();
+  // ml
+  late ImageClassifierService _classifierService;
+  late EfficientNetClassifier _efficientNetClassifier;
+  bool _isModelLoading = true;
+  bool _isClassifierProcessing = false;
 
   Category? _category;
   late Item _currentItem;
@@ -35,11 +42,9 @@ class _EditItemPageState extends State<EditItemPage> {
   String? _selectedImagePath;
   String? _selectedImageBase64;
   bool _isCreating = false;
-  // иишка
-  late ImageClassifierService _classifierService;
   Category? _suggestedCategory;
   // категории
-  bool _hasChanges = false; // Флаг изменений для категории
+  bool _hasChanges = false; // флаг изменений для категории
 
   // final GalleryService _galleryService = GalleryService();
 
@@ -48,6 +53,8 @@ class _EditItemPageState extends State<EditItemPage> {
     super.initState();
     _isCreating = widget.item == null;
     _loadCategory();
+    _efficientNetClassifier = EfficientNetClassifier();
+    _waitForModel();
     _classifierService = ImageClassifierService();
 
     // если передан parentId
@@ -69,6 +76,7 @@ class _EditItemPageState extends State<EditItemPage> {
 
   @override
   void dispose() {
+    _efficientNetClassifier.dispose();
     _nameController.dispose();
     _descriptionController.dispose();
     _classifierService = ImageClassifierService();
@@ -478,12 +486,12 @@ class _EditItemPageState extends State<EditItemPage> {
         // Предложение категории (для мобилок - через файл, для веба - через base64)
         if (kIsWeb) {
           // Для веба - создаем временный файл из base64 для ML Kit
-          await _findCategoryForImage(imageData as File);
-          await _processImage(imageData);
+          //await _findCategoryForImage(imageData as File);
+          await _classifyWithEfficientNet(File(pickedFile.path));
         } else {
           // Для мобилок - используем файл
-          await _findCategoryForImage(File(pickedFile.path));
-          await _processImage(pickedFile.path);
+          //await _findCategoryForImage(File(pickedFile.path));
+          await _classifyWithEfficientNet(File(pickedFile.path));
         }
       }
     } catch (e) {
@@ -665,22 +673,6 @@ class _EditItemPageState extends State<EditItemPage> {
     );
   }
 
-  Future<void> _processImage(String imagePath) async {
-    final recognizedText = await _ocrService.recognizeText(imagePath);
-
-    setState(() {
-      _nameController.text = recognizedText;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Название обновлено: "$recognizedText"'),
-        duration: const Duration(seconds: 2),
-        backgroundColor: Colors.green,
-      ),
-    );
-  }
-
   Future<void> _findCategoryForImage(File image) async {
     final category = await _classifierService.findCategory(image);
 
@@ -791,5 +783,100 @@ class _EditItemPageState extends State<EditItemPage> {
     setState(() {
       _suggestedCategory = category;
     });
+  }
+
+  Future<void> _classifyWithEfficientNet(File imageFile) async {
+    if (!_efficientNetClassifier.isReady) {
+      print('⚠EfficientNet ещё не загружен');
+      return;
+    }
+
+    setState(() => _isClassifierProcessing = true);
+
+    try {
+      final classificationResults  = await _efficientNetClassifier.classifyImage(imageFile);
+      final recognizedText = await _ocrService.recognizeText(imageFile.path);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('распознанный текст "$recognizedText"'),
+          duration: const Duration(seconds: 3),
+          backgroundColor: Colors.orange,
+        ),
+      );
+
+      String finalName;
+      String? usedMethod;
+
+      if (classificationResults.isNotEmpty) {
+        final topResult = classificationResults.first;
+        final label = topResult['label'];
+        final confidenceValue = topResult['confidence'];
+        var confidence = double.tryParse(confidenceValue);
+        final russianLabel = LabelTranslator.translate(label);
+
+        if (confidence! < 50.0) {
+          finalName = recognizedText.isNotEmpty ? recognizedText : russianLabel;
+          usedMethod = confidence < 50.0
+              ? (recognizedText.isNotEmpty ? 'OCR (низкая уверенность классификации: ${confidence.toStringAsFixed(1)}%)' : 'Классификация (низкая уверенность, OCR не дал результат)')
+              : null;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('⚠Низкая уверенность классификации (${confidence.toStringAsFixed(1)}%), использован OCR: "$recognizedText"'),
+              duration: const Duration(seconds: 3),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        } else {
+          finalName = russianLabel;
+          usedMethod = 'Классификация (${confidence.toStringAsFixed(1)}%)';
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('🔍 Распознано: $russianLabel ($confidence%)'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        finalName = recognizedText.isNotEmpty ? recognizedText : '';
+        usedMethod = recognizedText.isNotEmpty ? 'OCR (классификация не дала результатов)' : 'Не распознано';
+        if (recognizedText.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('⚠Не удалось распознать изображение ни одним способом'),
+              duration: Duration(seconds: 2),
+              backgroundColor: Colors.red,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('📝 Использован OCR: "$recognizedText"'),
+              duration: const Duration(seconds: 2),
+              backgroundColor: Colors.blue,
+            ),
+          );
+        }
+      }
+      setState(() {
+        _nameController.text = finalName;
+      });
+      print('Результат: $usedMethod -> "$finalName"');
+    } catch (e) {
+      print('Ошибка EfficientNet: $e');
+    } finally {
+      if (mounted) setState(() => _isClassifierProcessing = false);
+    }
+  }
+
+  Future<void> _waitForModel() async {
+    while (!_efficientNetClassifier.isReady && mounted) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+    if (mounted) {
+      setState(() {
+        _isModelLoading = false;
+      });
+      print('EfficientNet готов к работе');
+    }
   }
 }

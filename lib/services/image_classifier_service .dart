@@ -1,4 +1,3 @@
-// image_classifier_service.dart
 import 'dart:io';
 import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
 import '../models/category.dart';
