@@ -5,6 +5,7 @@ import 'package:catalog_app_mobile/pages/reminder_list_page.dart';
 import 'package:catalog_app_mobile/pages/settings_page.dart';
 import 'package:catalog_app_mobile/pages/statistic_page.dart';
 import 'package:catalog_app_mobile/pages/tag_list_page.dart';
+import 'package:catalog_app_mobile/pages/unauthorized_page.dart';
 import 'package:flutter/material.dart';
 
 import '../pages/item_list_page.dart';
@@ -94,6 +95,39 @@ class AppDrawer extends StatelessWidget {
               );
             },
           ),
+          ListTile(
+            leading: const Icon(Icons.door_front_door_outlined, color: Colors.brown),
+            title: const Text('Выйти'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const UnauthorizedPage()),
+              );
+            },
+          ),
+/*          ListTile(
+            leading: const Icon(Icons.door_front_door, color: Colors.brown),
+            title: const Text('Войти в аккаунт'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => LoginPage()),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.app_registration, color: Colors.brown),
+            title: const Text('Регистрация'),
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => RegistrationPage()),
+              );
+            },
+          ),*/
           // ListTile(
           //   leading: const Icon(Icons.door_front_door, color: Colors.brown),
           //   title: const Text('Войти в аккаунт'),

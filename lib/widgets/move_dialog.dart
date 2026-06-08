@@ -259,10 +259,10 @@ class _MoveDialogState extends State<MoveDialog> {
                   ),
                   child: Text(
                     _selectedFolder != null
-                        ? 'Переместить в "${_selectedFolder!.name}"'
+                        ? 'Переместить"'
                         : _path.isNotEmpty
-                        ? 'Переместить в "${_path.last.name}"'
-                        : 'Переместить в корень',
+                        ? 'Переместить"'
+                        : 'Переместить',
                     style: const TextStyle(color: Colors.white),
                   ),
                 ),

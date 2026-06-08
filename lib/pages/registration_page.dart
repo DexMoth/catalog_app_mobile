@@ -53,6 +53,7 @@ class RegistrationPage extends StatelessWidget {
                     },
                     child: const Text('Зарегистрироваться'),
                   ),
+
                 ],
               ),
             ),

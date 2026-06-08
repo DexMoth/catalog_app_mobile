@@ -4,7 +4,7 @@ class ServerSettingsService {
   static const String _ipKey = 'server_ip';
   static const String _portKey = 'server_port';
 
-  static const String defaultIp = '192.168.1.14';
+  static const String defaultIp = '192.168.0.12';
   static const int defaultPort = 8080;
 
   /// получить сохранённый IP

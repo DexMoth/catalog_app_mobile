@@ -46,6 +46,7 @@ class LoginPage extends StatelessWidget {
                     },
                     child: const Text('Войти'),
                   ),
+
                 ],
               ),
             ),
