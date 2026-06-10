@@ -13,6 +13,7 @@ import '../services/image_service.dart';
 import '../widgets/appDrawer.dart';
 import '../widgets/move_dialog.dart';
 import 'item_detail_page.dart';
+import 'move_page.dart';
 
 class ItemListPage extends StatefulWidget {
   final ApiService? apiService;
@@ -401,13 +402,15 @@ class _ItemListPageState extends State<ItemListPage> {
   }
 
   void showMoveDialog(Item item) {
-    showDialog(
-      context: context,
-      builder: (context) => MoveDialog(
-        itemToMove: item,
-        onMoveComplete: () {
-          _loadItems();
-        },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MovePage(
+          itemToMove: item,
+          onMoveComplete: () {
+            _loadItems();
+          },
+        ),
       ),
     );
   }

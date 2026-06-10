@@ -41,10 +41,6 @@ class ReminderDetailPageState extends State<ReminderDetailPage> {
   @override
   // закрытие
   void dispose() {
-    // сохраняем изменения
-    if (_hasChanges) {
-      _saveChanges();
-    }
     _titleController.dispose();
     _descriptionController.dispose();
     _messageController.dispose();

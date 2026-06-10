@@ -9,9 +9,21 @@ import 'package:catalog_app_mobile/pages/unauthorized_page.dart';
 import 'package:flutter/material.dart';
 
 import '../pages/item_list_page.dart';
+import '../services/auth_service.dart';
 
 class AppDrawer extends StatelessWidget {
   const AppDrawer({super.key});
+
+  Future<void> _logout(BuildContext context) async {
+    await AuthService().logout();
+    if (context.mounted) {
+      Navigator.pop(context);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const UnauthorizedPage()),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -96,15 +108,9 @@ class AppDrawer extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.door_front_door_outlined, color: Colors.brown),
+            leading: const Icon(Icons.logout, color: Colors.brown),
             title: const Text('Выйти'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const UnauthorizedPage()),
-              );
-            },
+            onTap: () => _logout(context),
           ),
 /*          ListTile(
             leading: const Icon(Icons.door_front_door, color: Colors.brown),

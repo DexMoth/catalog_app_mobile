@@ -4,6 +4,9 @@ import 'package:catalog_app_mobile/services/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 
+import 'pages/unauthorized_page.dart';
+import 'services/auth_service.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -18,20 +21,17 @@ void main() async {
       final reminders = await ApiService().getReminders();
       await NotificationService().rescheduleAll(reminders);
     } catch (e) {
-      print('⚠️ Ошибка при перепланировании уведомлений: $e');
+      print('!!!Ошибка при перепланировании уведомлений: $e');
     }
   } else {
-    print('ℹ️ Уведомления не поддерживаются на Web');
+    print('Уведомления не поддерживаются на Web');
   }
-
 
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
-
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -40,7 +40,33 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const ItemListPage(),
+      home: const AuthWrapper(),
+    );
+  }
+}
+
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<bool>(
+      future: AuthService().isLoggedIn(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final isLoggedIn = snapshot.data ?? false;
+
+        if (isLoggedIn) {
+          return const ItemListPage();
+        } else {
+          return const UnauthorizedPage();
+        }
+      },
     );
   }
 }

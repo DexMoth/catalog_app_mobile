@@ -15,12 +15,13 @@ class MoveDialog extends StatefulWidget {
   @override
   State<MoveDialog> createState() => _MoveDialogState();
 }
+
 class _MoveDialogState extends State<MoveDialog> {
   List<Item> _folders = [];
   bool _isLoading = true;
   Item? _selectedFolder;
-  List<Item> _path = []; // Текущий путь в иерархии
-  Map<int, List<Item>> _childrenCache = {}; // Кэш детей для каждой папки
+  List<Item> _path = [];
+  Map<int, List<Item>> _childrenCache = {};
 
   @override
   void initState() {
@@ -28,7 +29,6 @@ class _MoveDialogState extends State<MoveDialog> {
     _loadRootFolders();
   }
 
-  // Загрузить корневые папки (без родителя)
   Future<void> _loadRootFolders() async {
     try {
       final items = await ApiService().getItems();
@@ -36,7 +36,6 @@ class _MoveDialogState extends State<MoveDialog> {
       item.parentId == null &&
           item.id != widget.itemToMove.id
       ).toList();
-
       setState(() {
         _isLoading = false;
       });
@@ -47,7 +46,6 @@ class _MoveDialogState extends State<MoveDialog> {
     }
   }
 
-  // Загрузить детей конкретной папки
   Future<void> _loadChildren(Item folder) async {
     if (_childrenCache.containsKey(folder.id)) {
       setState(() {
@@ -59,7 +57,6 @@ class _MoveDialogState extends State<MoveDialog> {
 
     try {
       final children = await ApiService().getChildrenItems(folder.id);
-      // Фильтруем саму перемещаемую вещь и её детей
       final filteredChildren = children.where((item) =>
       item.id != widget.itemToMove.id &&
           item.parentId != widget.itemToMove.id
@@ -76,17 +73,14 @@ class _MoveDialogState extends State<MoveDialog> {
     }
   }
 
-  // Вернуться на уровень выше
   void _goBack() {
     if (_path.isEmpty) return;
 
     setState(() {
       _path.removeLast();
       if (_path.isEmpty) {
-        // Вернулись в корень
         _loadRootFolders();
       } else {
-        // Вернулись к предыдущей папке
         final parent = _path.last;
         _folders = _childrenCache[parent.id] ?? [];
       }
@@ -98,8 +92,10 @@ class _MoveDialogState extends State<MoveDialog> {
     return Dialog(
       child: Container(
         padding: const EdgeInsets.all(16),
-        width: MediaQuery.of(context).size.width * 0.9,
-        height: MediaQuery.of(context).size.height * 0.7,
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.99,
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
         child: Column(
           children: [
             // Заголовок с хлебными крошками
@@ -112,9 +108,7 @@ class _MoveDialogState extends State<MoveDialog> {
                   ),
                 Expanded(
                   child: Text(
-                    _path.isEmpty
-                        ? 'Корень'
-                        : _path.last.name,
+                    _path.isEmpty ? 'Корень' : _path.last.name,
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -139,7 +133,6 @@ class _MoveDialogState extends State<MoveDialog> {
                     children: [
                       GestureDetector(
                         onTap: () {
-                          // Вернуться в корень
                           setState(() {
                             _path.clear();
                           });
@@ -156,7 +149,6 @@ class _MoveDialogState extends State<MoveDialog> {
                             const Text(' / '),
                             GestureDetector(
                               onTap: () {
-                                // Перейти к этой папке
                                 final index = _path.indexOf(folder);
                                 setState(() {
                                   _path = _path.sublist(0, index + 1);
@@ -183,7 +175,11 @@ class _MoveDialogState extends State<MoveDialog> {
               color: Colors.blue[50],
               child: ListTile(
                 leading: const Icon(Icons.drive_file_move, color: Colors.blue),
-                title: Text('Перемещаем: ${widget.itemToMove.name}'),
+                title: Text(
+                  '${widget.itemToMove.name}',
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
               ),
             ),
 
@@ -196,42 +192,39 @@ class _MoveDialogState extends State<MoveDialog> {
                   ? const Center(child: CircularProgressIndicator())
                   : _folders.isEmpty
                   ? const Center(child: Text('Папка пуста'))
-                  : ListView.builder(
-                itemCount: _folders.length,
-                itemBuilder: (context, index) {
-                  final folder = _folders[index];
-                  return Card(
-                    color: _selectedFolder?.id == folder.id
-                        ? Colors.amber[50]
-                        : null,
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: const Icon(Icons.folder, color: Colors.amber),
-                      title: Text(folder.name),
-                      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                      onTap: () {
-                        // Выбрать эту папку как целевую
-                        setState(() {
-                          _selectedFolder = folder;
-                        });
-                      },
-                      onLongPress: () {
-                        // Зайти внутрь папки
-                        _loadChildren(folder);
-                      },
-                    ),
-                  );
-                },
+                  : SingleChildScrollView(  // ← ОБЕРНУЛИ В SingleChildScrollView
+                child: Column(
+                  children: _folders.map((folder) {
+                    return Card(
+                      color: _selectedFolder?.id == folder.id
+                          ? Colors.amber[50]
+                          : null,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: const Icon(Icons.folder, color: Colors.amber),
+                        title: Text(folder.name),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () {
+                          setState(() {
+                            _selectedFolder = folder;
+                          });
+                        },
+                        onLongPress: () {
+                          _loadChildren(folder);
+                        },
+                      ),
+                    );
+                  }).toList(),
+                ),
               ),
             ),
 
-            // Кнопка "Выбрать эту папку" (только если выбрана папка)
+            // Кнопка "Зайти в выбранную папку"
             if (_selectedFolder != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    // Зайти внутрь выбранной папки
                     _loadChildren(_selectedFolder!);
                     setState(() {
                       _selectedFolder = null;
@@ -251,7 +244,7 @@ class _MoveDialogState extends State<MoveDialog> {
                   child: const Text('Отмена'),
                 ),
                 ElevatedButton(
-                  onPressed: _selectedFolder != null || _path.isNotEmpty
+                  onPressed: (_selectedFolder != null || _path.isNotEmpty)
                       ? _moveItem
                       : null,
                   style: ElevatedButton.styleFrom(
@@ -259,9 +252,9 @@ class _MoveDialogState extends State<MoveDialog> {
                   ),
                   child: Text(
                     _selectedFolder != null
-                        ? 'Переместить"'
+                        ? 'Переместить'
                         : _path.isNotEmpty
-                        ? 'Переместить"'
+                        ? 'Переместить'
                         : 'Переместить',
                     style: const TextStyle(color: Colors.white),
                   ),

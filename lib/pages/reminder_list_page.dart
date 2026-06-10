@@ -56,7 +56,7 @@ class _ReminderListPageState extends State<ReminderListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
         appBar: AppBar(
-          title: const Text('Умные напоминания'),
+          title: const Text('Напоминания'),
           backgroundColor: Colors.brown,
           foregroundColor: Colors.white,
         ),

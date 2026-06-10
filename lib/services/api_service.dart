@@ -2,31 +2,47 @@ import 'dart:convert';
 
 import 'package:catalog_app_mobile/models/reminder.dart';
 import 'package:catalog_app_mobile/models/tag.dart';
-import 'package:dio/dio.dart';
 import 'package:http/http.dart' as http;
 import '../models/category.dart';
 import '../models/item.dart';
 import 'package:catalog_app_mobile/configuration/app_config.dart';
 
-class ApiService {
-  // временный userId для тестирования
-  static const int _currentUserId = 2;
+import 'auth_service.dart';
 
-  // вспомогательный метод для добавления userId к URL
-  Future<String> _urlWithUserId(String path) async {
-    final base = await AppConfig.baseUrl;
-    return '$base$path?userId=$_currentUserId';
+class ApiService {
+  final AuthService _authService = AuthService();
+
+  Future<int?> _getCurrentUserId() async {
+    return await _authService.getCurrentUserId();
   }
 
-  Future<List<Item>> getItems({String searchQuery = ''}) async {
+  // Вспомогательный метод для добавления userId к URL
+  Future<String> _urlWithUserId(String path) async {
+    final base = await AppConfig.baseUrl;
+    final userId = await _getCurrentUserId();
+    return '$base$path?userId=$userId';
+  }
 
+  // Токен авторизации
+  Future<Map<String, String>> _getHeaders() async {
+    final token = await _authService.getToken();
+    return {
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  // ==================== ITEMS ====================
+
+  Future<List<Item>> getItems({String searchQuery = ''}) async {
     var url = await _urlWithUserId('/item');
 
     if (searchQuery.isNotEmpty) {
       url += '&search=${Uri.encodeQueryComponent(searchQuery)}';
     }
 
-    final response = await http.get(Uri.parse(url));
+    final headers = await _getHeaders();
+    final response = await http.get(Uri.parse(url), headers: headers);
 
     if (response.statusCode == 200) {
       final List<dynamic> jsonList = json.decode(response.body);
@@ -37,19 +53,21 @@ class ApiService {
   }
 
   Future<Item> createItem(Item item) async {
-    var url = await _urlWithUserId('/item');
+    final url = await _urlWithUserId('/item');
+    final headers = await _getHeaders();
+    final userId = await _getCurrentUserId();  // ← Ждём значение
 
     final response = await http.post(
       Uri.parse(url),
-      headers: {'Content-Type': 'application/json'},
+      headers: headers,
       body: json.encode({
         'name': item.name,
         'description': item.description,
         'imagePath': item.imagePath,
         'parentId': item.parentId,
         'category': item.category,
-        'tags': item.tags,
-        'userId': _currentUserId,
+        'tags': item.tags?.map((t) => t.toJson()).toList(),
+        'userId': userId,  // ← Теперь это int, а не Future
         'createdAt': item.createdAt.toIso8601String(),
         'updatedAt': item.updatedAt.toIso8601String(),
       }),
@@ -63,29 +81,29 @@ class ApiService {
   }
 
   Future<Item> updateItem(Item item) async {
-    var url = await _urlWithUserId('/item/${item.id}');
+    final url = await _urlWithUserId('/item/${item.id}');
+    final headers = await _getHeaders();
+    final userId = await _getCurrentUserId();  // ← Ждём значение
 
     try {
       final response = await http.put(
         Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
         body: json.encode({
           'name': item.name,
           'description': item.description,
           'imagePath': item.imagePath,
           'parentId': item.parentId,
           'category': item.category,
-          'tags': item.tags,
+          'tags': item.tags?.map((t) => t.toJson()).toList(),
+          'userId': userId,  // ← Теперь int
           'createdAt': item.createdAt.toIso8601String(),
           'updatedAt': item.updatedAt.toIso8601String(),
         }),
       );
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        return Item.fromJson(data);
+        return Item.fromJson(json.decode(response.body));
       } else if (response.statusCode == 404) {
         throw Exception('Элемент не найден');
       } else {
@@ -96,59 +114,23 @@ class ApiService {
     }
   }
 
-  // обновление только тегов
-  Future<void> updateItemTags(int itemId, List<int> tags) async {
-    var url = await _urlWithUserId('/item/$itemId/tags');
-
-    try {
-      final response = await http.patch(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'tags': tags}),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('Ошибка обновления тегов: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Ошибка сети: $e');
-    }
-  }
-
-  // обновление только категорий
-  Future<void> updateItemCategories(int itemId, List<int> categories) async {
-    var url = await _urlWithUserId('/item/$itemId/categories');
-
-    try {
-      final response = await http.patch(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({'categories': categories}),
-      );
-
-      if (response.statusCode != 200) {
-        throw Exception('Ошибка обновления категорий: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Ошибка сети: $e');
-    }
-  }
-
   Future<List<Item>> getChildrenItems(int parentId) async {
-    var url = await await _urlWithUserId('/item/$parentId/children');
-    final response = await http.get(Uri.parse(url));
+    final url = await _urlWithUserId('/item/$parentId/children');
+    final headers = await _getHeaders();
+    final response = await http.get(Uri.parse(url), headers: headers);
 
     if (response.statusCode == 200) {
-    final List<dynamic> jsonList = json.decode(response.body);
-    return jsonList.map((json) => Item.fromJson(json)).toList();
+      final List<dynamic> jsonList = json.decode(response.body);
+      return jsonList.map((json) => Item.fromJson(json)).toList();
     } else {
-    throw Exception('Failed to load items: ${response.statusCode}');
+      throw Exception('Failed to load items: ${response.statusCode}');
     }
   }
 
   Future<List<Item>> getItemsWithoutParent() async {
-    var url = await _urlWithUserId('/item/roots');
-    final response = await http.get(Uri.parse(url));
+    final url = await _urlWithUserId('/item/roots');
+    final headers = await _getHeaders();
+    final response = await http.get(Uri.parse(url), headers: headers);
 
     if (response.statusCode == 200) {
       final List<dynamic> jsonList = json.decode(response.body);
@@ -159,12 +141,11 @@ class ApiService {
   }
 
   Future<bool> deleteItem(int itemId) async {
-   var url = await _urlWithUserId('/item/$itemId');
+    final url = await _urlWithUserId('/item/$itemId');
+    final headers = await _getHeaders();
 
     try {
-      final response = await http.delete(
-        Uri.parse(url),
-      );
+      final response = await http.delete(Uri.parse(url), headers: headers);
 
       if (response.statusCode == 200 || response.statusCode == 204) {
         return true;
@@ -178,30 +159,32 @@ class ApiService {
     }
   }
 
+  // ==================== ТЕГИ ====================
 
-  ///////////////// ТЕГИ //////////////
   Future<List<Tag>> getTags() async {
-    var url = await _urlWithUserId('/tag');
-
-    final response = await http.get(Uri.parse(url));
+    final url = await _urlWithUserId('/tag');
+    final headers = await _getHeaders();
+    final response = await http.get(Uri.parse(url), headers: headers);
 
     if (response.statusCode == 200) {
       final List<dynamic> jsonList = json.decode(response.body);
       return jsonList.map((json) => Tag.fromJson(json)).toList();
     } else {
-      throw Exception('Failed to load items: ${response.statusCode}');
+      throw Exception('Failed to load tags: ${response.statusCode}');
     }
   }
 
   Future<Tag> createTag(String name) async {
-    var url = await _urlWithUserId('/tag');
+    final url = await _urlWithUserId('/tag');
+    final headers = await _getHeaders();
+    final userId = await _getCurrentUserId();  // ← Ждём значение
 
     final response = await http.post(
       Uri.parse(url),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({''
-          'name': name,
-          'userId': _currentUserId,
+      headers: headers,
+      body: json.encode({
+        'name': name,
+        'userId': userId,  // ← Теперь int
       }),
     );
 
@@ -213,23 +196,22 @@ class ApiService {
   }
 
   Future<Tag> updateTag(Tag tag) async {
-    var url = await _urlWithUserId('/tag/${tag.id}');
+    final url = await _urlWithUserId('/tag/${tag.id}');
+    final headers = await _getHeaders();
+    final userId = await _getCurrentUserId();  // ← Ждём значение
 
     try {
       final response = await http.put(
         Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
         body: json.encode({
           'name': tag.name,
-          'userId': _currentUserId
+          'userId': userId,  // ← Теперь int
         }),
       );
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        return Tag.fromJson(data);
+        return Tag.fromJson(json.decode(response.body));
       } else if (response.statusCode == 404) {
         throw Exception('Элемент не найден');
       } else {
@@ -241,12 +223,11 @@ class ApiService {
   }
 
   Future<bool> deleteTag(int tagId) async {
-    var url = await _urlWithUserId('/tag/$tagId');
+    final url = await _urlWithUserId('/tag/$tagId');
+    final headers = await _getHeaders();
 
     try {
-      final response = await http.delete(
-        Uri.parse(url),
-      );
+      final response = await http.delete(Uri.parse(url), headers: headers);
 
       if (response.statusCode == 200 || response.statusCode == 204) {
         return true;
@@ -260,69 +241,69 @@ class ApiService {
     }
   }
 
-  ///////////////// КАТЕГОРИИ //////////////
-  Future<List<Category>> getCategories() async {
-    var url = await _urlWithUserId('/category');
+  // ==================== КАТЕГОРИИ ====================
 
-    final response = await http.get(Uri.parse(url));
+  Future<List<Category>> getCategories() async {
+    final url = await _urlWithUserId('/category');
+    final headers = await _getHeaders();
+    final response = await http.get(Uri.parse(url), headers: headers);
 
     if (response.statusCode == 200) {
       final List<dynamic> jsonList = json.decode(response.body);
       return jsonList.map((json) => Category.fromJson(json)).toList();
     } else {
-      throw Exception('Failed to load items: ${response.statusCode}');
+      throw Exception('Failed to load categories: ${response.statusCode}');
     }
   }
 
   Future<Category> getCategory(int id) async {
-    var url = await _urlWithUserId('/category/$id');
-
-    final response = await http.get(Uri.parse(url));
+    final url = await _urlWithUserId('/category/$id');
+    final headers = await _getHeaders();
+    final response = await http.get(Uri.parse(url), headers: headers);
 
     if (response.statusCode == 200) {
-      final Map<String, dynamic> jsonData = json.decode(response.body);
-      return Category.fromJson(jsonData);
+      return Category.fromJson(json.decode(response.body));
     } else {
-      throw Exception('Failed to load items: ${response.statusCode}');
+      throw Exception('Failed to load category: ${response.statusCode}');
     }
   }
 
   Future<Category> createCategory(String name) async {
-    var url = await _urlWithUserId('/category');
+    final url = await _urlWithUserId('/category');
+    final headers = await _getHeaders();
+    final userId = await _getCurrentUserId();  // ← Ждём значение
 
     final response = await http.post(
       Uri.parse(url),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({''
-          'name': name,
-          'userId': _currentUserId,
+      headers: headers,
+      body: json.encode({
+        'name': name,
+        'userId': userId,  // ← Теперь int
       }),
     );
 
     if (response.statusCode == 200) {
       return Category.fromJson(json.decode(response.body));
     } else {
-      throw Exception('Failed to create tag');
+      throw Exception('Failed to create category');
     }
   }
 
   Future<Category> updateCategory(Category category) async {
-    var url = await _urlWithUserId('/category/${category.id}');
+    final url = await _urlWithUserId('/category/${category.id}');
+    final headers = await _getHeaders();
 
     try {
       final response = await http.put(
         Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
         body: json.encode({
           'name': category.name,
         }),
       );
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        return Category.fromJson(data);
+        return Category.fromJson(json.decode(response.body));
       } else if (response.statusCode == 404) {
         throw Exception('Элемент не найден');
       } else {
@@ -334,12 +315,11 @@ class ApiService {
   }
 
   Future<bool> deleteCategory(int categoryId) async {
-    var url = await _urlWithUserId('/category/$categoryId');
+    final url = await _urlWithUserId('/category/$categoryId');
+    final headers = await _getHeaders();
 
     try {
-      final response = await http.delete(
-        Uri.parse(url),
-      );
+      final response = await http.delete(Uri.parse(url), headers: headers);
 
       if (response.statusCode == 200 || response.statusCode == 204) {
         return true;
@@ -353,12 +333,12 @@ class ApiService {
     }
   }
 
-// reminders
+  // ==================== НАПОМИНАНИЯ ====================
 
   Future<List<Reminder>> getReminders() async {
-    var url = await _urlWithUserId('/reminder');
-
-    final response = await http.get(Uri.parse(url));
+    final url = await _urlWithUserId('/reminder');
+    final headers = await _getHeaders();
+    final response = await http.get(Uri.parse(url), headers: headers);
 
     if (response.statusCode == 200) {
       final List<dynamic> jsonList = json.decode(response.body);
@@ -369,23 +349,25 @@ class ApiService {
   }
 
   Future<Reminder> createReminder(Reminder reminder) async {
-    var url = await _urlWithUserId('/reminder');
+    final url = await _urlWithUserId('/reminder');
+    final headers = await _getHeaders();
+    final userId = await _getCurrentUserId();  // ← Ждём значение
 
     final response = await http.post(
       Uri.parse(url),
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({''
+      headers: headers,
+      body: json.encode({
         'id': reminder.id,
         'title': reminder.title,
         'description': reminder.description,
         'message': reminder.message,
         'itemId': reminder.itemId,
-        'recurrenceRule': reminder.recurrenceRule,
+        'recurrenceRule': reminder.recurrenceRule?.toJson(),
         'reminderDate': reminder.reminderDate?.toIso8601String(),
         'isActive': reminder.isActive,
         'createdAt': reminder.createdAt.toIso8601String(),
         'updatedAt': reminder.updatedAt.toIso8601String(),
-        'userId': _currentUserId,
+        'userId': userId,  // ← Теперь int
       }),
     );
 
@@ -397,32 +379,31 @@ class ApiService {
   }
 
   Future<Reminder> updateReminder(Reminder reminder) async {
-    var url = await _urlWithUserId('/reminder/${reminder.id}');
+    final url = await _urlWithUserId('/reminder/${reminder.id}');
+    final headers = await _getHeaders();
+    final userId = await _getCurrentUserId();  // ← Ждём значение
 
     try {
       final response = await http.put(
         Uri.parse(url),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
         body: json.encode({
           'id': reminder.id,
           'title': reminder.title,
           'description': reminder.description,
           'message': reminder.message,
           'itemId': reminder.itemId,
-          'recurrenceRule': reminder.recurrenceRule,
+          'recurrenceRule': reminder.recurrenceRule?.toJson(),
           'reminderDate': reminder.reminderDate?.toIso8601String(),
           'isActive': reminder.isActive,
           'createdAt': reminder.createdAt.toIso8601String(),
           'updatedAt': reminder.updatedAt.toIso8601String(),
-          'userId': _currentUserId,
+          'userId': userId,  // ← Теперь int
         }),
       );
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = json.decode(response.body);
-        return Reminder.fromJson(data);
+        return Reminder.fromJson(json.decode(response.body));
       } else if (response.statusCode == 404) {
         throw Exception('Элемент не найден');
       } else {
@@ -437,9 +418,11 @@ class ApiService {
     try {
       final base = await AppConfig.baseUrl;
       final url = '$base/reminder/$reminderId/active?isActive=$isActive';
+      final headers = await _getHeaders();
+
       final response = await http.put(
         Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
       );
 
       if (response.statusCode != 200) {
@@ -451,12 +434,11 @@ class ApiService {
   }
 
   Future<bool> deleteReminder(int reminderId) async {
-    var url = await _urlWithUserId('/reminder/$reminderId');
+    final url = await _urlWithUserId('/reminder/$reminderId');
+    final headers = await _getHeaders();
 
     try {
-      final response = await http.delete(
-        Uri.parse(url),
-      );
+      final response = await http.delete(Uri.parse(url), headers: headers);
 
       if (response.statusCode == 200 || response.statusCode == 204) {
         return true;

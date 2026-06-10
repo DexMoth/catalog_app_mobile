@@ -10,6 +10,7 @@ import '../widgets/move_dialog.dart';
 import 'item_detail_page.dart';
 import 'item_edit_page.dart';
 import 'item_list_page.dart';
+import 'move_page.dart';
 
 class ItemChildrenPage extends StatefulWidget {
   final Item parentItem;
@@ -425,13 +426,15 @@ class _ItemChildrenPageState extends State<ItemChildrenPage> {
   }
 
   void showMoveDialog(Item item) {
-    showDialog(
-      context: context,
-      builder: (context) => MoveDialog(
-        itemToMove: item,
-        onMoveComplete: () {
-          _loadChildren();
-        },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MovePage(
+          itemToMove: item,
+          onMoveComplete: () {
+            _loadChildren();
+          },
+        ),
       ),
     );
   }

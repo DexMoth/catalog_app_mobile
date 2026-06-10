@@ -13,6 +13,7 @@ import '../services/image_service.dart';
 import '../services/image_storage.dart';
 import '../services/ocr_service.dart';
 import '../services/efficientnet_classifier.dart';
+import '../utils/category_matcher.dart';
 import '../utils/label_translations.dart';
 
 class EditItemPage extends StatefulWidget {
@@ -52,7 +53,6 @@ class _EditItemPageState extends State<EditItemPage> {
   void initState() {
     super.initState();
     _isCreating = widget.item == null;
-    _loadCategory();
     _efficientNetClassifier = EfficientNetClassifier();
     _waitForModel();
     _classifierService = ImageClassifierService();
@@ -66,7 +66,10 @@ class _EditItemPageState extends State<EditItemPage> {
       _currentItem = widget.item ?? Item.empty();
     }
 
+    _loadCategory();
+
     _nameController = TextEditingController(text: _currentItem.name);
+    _nameController.addListener(_autoMatchCategory);
     _descriptionController = TextEditingController(text: _currentItem.description);
 
     if (_currentItem.imagePath != null && _currentItem.imagePath!.isNotEmpty) {
@@ -78,6 +81,7 @@ class _EditItemPageState extends State<EditItemPage> {
   void dispose() {
     _efficientNetClassifier.dispose();
     _nameController.dispose();
+    _nameController.removeListener(_autoMatchCategory);
     _descriptionController.dispose();
     _classifierService = ImageClassifierService();
     super.dispose();
@@ -501,31 +505,38 @@ class _EditItemPageState extends State<EditItemPage> {
   }
 
   Future<void> _loadCategory() async {
+    print('Загрузка $_currentItem.category');
     if (_currentItem.category != null) {
-      final cat = await _apiService.getCategory(_currentItem.category!);
-      if (mounted) {
-        setState(() {
-          _category = cat;
-        });
+      try {
+        final cat = await _apiService.getCategory(_currentItem.category!);
+        if (mounted) {
+          setState(() {
+            _category = cat;
+          });
+        }
+      } catch (e) {
+        print('Ошибка загрузки категории: $e');
+        if (mounted) {
+          setState(() {
+            _category = null;
+          });
+        }
       }
     }
   }
 
   Widget _buildCategoryWidget() {
-    // если не выбрана
-    if (_currentItem.category == null) {
-      return const Text('Категория не выбрана');
-    }
-
-    // если загружается
+    // категория загружается
     if (_category == null) {
-      return const SizedBox(height:  14);
+      return const SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
     }
 
-    return Text(
-      _category!.name,
-      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-    );
+    // загружена
+    return Text(_category!.name);
   }
 
   Widget _buildCategories(BuildContext context) {
@@ -534,12 +545,11 @@ class _EditItemPageState extends State<EditItemPage> {
 
     return SizedBox(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 6,
-            runSpacing: 1,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               // если есть выбранная категория
               if (itemCategories != null)
@@ -558,15 +568,6 @@ class _EditItemPageState extends State<EditItemPage> {
                   labelStyle: const TextStyle(color: Colors.brown),
                   padding: EdgeInsets.zero,
                   visualDensity: VisualDensity.compact,
-                ),
-              if (itemCategories != null && !hasSuggested)
-                const Text(
-                  'Категория не выбрана',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontStyle: FontStyle.italic,
-                    fontSize: 12,
-                  ),
                 ),
               IconButton(
                 onPressed: () {
@@ -749,7 +750,7 @@ class _EditItemPageState extends State<EditItemPage> {
       final XFile? photo = await _picker.pickImage(source: ImageSource.camera);
 
       if (photo != null) {
-        // очищаем кеш
+        // Очищаем кэш
         if (_currentItem.imagePath != null && !kIsWeb) {
           final oldImageProvider = FileImage(File(_currentItem.imagePath!));
           imageCache.evict(oldImageProvider);
@@ -767,10 +768,26 @@ class _EditItemPageState extends State<EditItemPage> {
             _selectedImagePath = null;
           });
         } else {
+          // Для мобильных устройств - читаем байты и конвертируем в base64
+          final bytes = await photo.readAsBytes();
+          final base64String = base64Encode(bytes);
+
+          // Определяем mime-type
+          final extension = path.extension(photo.name).toLowerCase();
+          String mimeType = 'image/jpeg';
+          if (extension == '.png') mimeType = 'image/png';
+          else if (extension == '.webp') mimeType = 'image/webp';
+
+          // Сохраняем как base64 (как и при выборе из галереи)
+          final imageData = 'data:$mimeType;base64,$base64String';
+
           setState(() {
-            _selectedImagePath = photo.path;
-            _selectedImageBase64 = null;
+            _selectedImageBase64 = imageData;
+            _selectedImagePath = null; // Очищаем путь к файлу, используем base64
+            _currentItem.imagePath = imageData;
           });
+
+          await _classifyWithEfficientNet(File(photo.path));
         }
       }
     } catch (e) {
@@ -796,13 +813,13 @@ class _EditItemPageState extends State<EditItemPage> {
     try {
       final classificationResults  = await _efficientNetClassifier.classifyImage(imageFile);
       final recognizedText = await _ocrService.recognizeText(imageFile.path);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('распознанный текст "$recognizedText"'),
-          duration: const Duration(seconds: 3),
-          backgroundColor: Colors.orange,
-        ),
-      );
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   SnackBar(
+      //     content: Text('распознанный текст "$recognizedText"'),
+      //     duration: const Duration(seconds: 3),
+      //     backgroundColor: Colors.orange,
+      //   ),
+      // );
 
       String finalName;
       String? usedMethod;
@@ -860,6 +877,7 @@ class _EditItemPageState extends State<EditItemPage> {
       setState(() {
         _nameController.text = finalName;
       });
+      _autoMatchCategory();
       print('Результат: $usedMethod -> "$finalName"');
     } catch (e) {
       print('Ошибка EfficientNet: $e');
@@ -877,6 +895,46 @@ class _EditItemPageState extends State<EditItemPage> {
         _isModelLoading = false;
       });
       print('EfficientNet готов к работе');
+    }
+  }
+
+  void _autoMatchCategory() {
+    final newName = _nameController.text.trim();
+    if (newName.isEmpty) return;
+
+    // Ищем категорию по названию
+    final categoryName = CategoryMatcher.matchCategory(newName.toLowerCase());
+    if (categoryName == null) return;
+
+    // Ищем ID категории по имени
+    _findCategoryIdByName(categoryName);
+  }
+
+  Future<void> _findCategoryIdByName(String categoryName) async {
+    try {
+      final categories = await _apiService.getCategories();
+      final matchedCategory = categories.firstWhere(
+            (cat) => cat.name.toLowerCase() == categoryName.toLowerCase(),
+        orElse: () => Category(id: 0, name: ''),
+      );
+
+      if (matchedCategory.id != 0 && mounted) {
+        setState(() {
+          _currentItem.category = matchedCategory.id;
+          _category = matchedCategory;
+          _hasChanges = true;
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Категория: ${matchedCategory.name}'),
+            duration: const Duration(seconds: 1),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      print('Ошибка поиска категории: $e');
     }
   }
 }

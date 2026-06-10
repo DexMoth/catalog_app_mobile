@@ -11,14 +11,13 @@ class UnauthorizedPage extends StatelessWidget {
       backgroundColor: Colors.brown,
       body: Center(
         child: Container(
-          height: 300,
           margin: const EdgeInsets.all(30),
           child: Card(
             color: Colors.white,
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 40.0, horizontal: 25.0),
+              padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 25),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
                     'Добро пожаловать!',
@@ -35,9 +34,9 @@ class UnauthorizedPage extends StatelessWidget {
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed: () {
-                        Navigator.push(
+                        Navigator.pushReplacement(
                           context,
-                          MaterialPageRoute(builder: (context) => LoginPage()),
+                          MaterialPageRoute(builder: (context) => const LoginPage()),
                         );
                       },
                       style: ElevatedButton.styleFrom(
@@ -52,11 +51,10 @@ class UnauthorizedPage extends StatelessWidget {
                     width: double.infinity,
                     child: OutlinedButton(
                       onPressed: () {
-                        // TODO: открыть страницу регистрации
-                        // Navigator.push(
-                        //   context,
-                        //   MaterialPageRoute(builder: (context) => const RegisterPage()),
-                        // );
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const RegistrationPage()),
+                        );
                       },
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Colors.brown),
