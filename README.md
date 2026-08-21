@@ -1,5 +1,7 @@
 # catalog_app_mobile
 
+# Посмотреть демо проект для ознакомления: https://drive.google.com/drive/folders/1R4hNv0O1uUn7eD6IVtOl_mi3ZroLwPbg?usp=sharing
+
 ## Подключение к телефону (физический носитель)
 
 Нужно запустить команду
