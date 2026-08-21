@@ -1,6 +1,6 @@
 # catalog_app_mobile
 
-### Посмотреть демо проект для ознакомления: https://drive.google.com/drive/folders/1R4hNv0O1uUn7eD6IVtOl_mi3ZroLwPbg?usp=sharing
+### Посмотреть демо проект для ознакомления: https://drive.google.com/file/d/1zEK3ETFe1bnfLRaDagSOsRPSsye14zhA/view?usp=drive_link
 
 ## Подключение к телефону (физический носитель)
 
